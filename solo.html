@@ -1,0 +1,1738 @@
+<title>Bird Game Solo</title>
+<style>
+  /* ---------------------------------------------------------------- base */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1020; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #fff; }
+  #game { position: fixed; inset: 0; display: block; touch-action: none; }
+  .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; }
+  .screen.show { display: flex; }
+  .panel { background: rgba(10, 16, 32, .88); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 14px 18px; max-width: 96vw; max-height: 96vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: 1px; text-align: center; background: linear-gradient(90deg,#ffd166,#ff8fa3,#8ecae6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  h2 { margin: 0 0 8px; font-size: 18px; text-align: center; }
+  .btn { display: inline-block; border: 0; border-radius: 12px; padding: 10px 22px; font-size: 16px; font-weight: 700; color: #fff; background: linear-gradient(180deg,#ffb703,#fb8500); cursor: pointer; box-shadow: 0 4px 0 #a04e00; }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #a04e00; }
+  .btn.secondary { background: linear-gradient(180deg,#4361ee,#3a0ca3); box-shadow: 0 4px 0 #240a6b; }
+  .row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+  input[type=text] { font-size: 16px; padding: 8px 10px; border-radius: 10px; border: 1px solid #556; background: #141a2e; color: #fff; width: 180px; user-select: text; -webkit-user-select: text; }
+  /* ---------------------------------------------------------------- bird select */
+  #birdScroll { overflow-x: auto; overflow-y: hidden; margin: 8px 0; padding-bottom: 4px; }
+  #birdInner { width: 744px; }
+  #previewCanvas { display: block; width: 744px; height: 104px; }
+  #cards { display: flex; gap: 4px; }
+  .card { width: 120px; flex: 0 0 120px; border-radius: 10px; padding: 6px; background: rgba(255,255,255,.06); border: 2px solid transparent; cursor: pointer; font-size: 11px; }
+  .card.sel { border-color: var(--c); background: rgba(255,255,255,.12); box-shadow: 0 0 14px var(--c); }
+  .card .nm { font-weight: 800; font-size: 13px; color: var(--c); text-shadow: 0 0 8px var(--c); }
+  .card .stat { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+  .card .stat span { width: 26px; opacity: .7; }
+  .card .bar { flex: 1; height: 5px; background: rgba(255,255,255,.12); border-radius: 3px; overflow: hidden; }
+  .card .bar i { display: block; height: 100%; background: var(--c); }
+  .card .ab { margin-top: 5px; font-weight: 700; color: #ffd166; }
+  .card .abd { opacity: .75; line-height: 1.2; }
+  /* ---------------------------------------------------------------- lobby */
+  #lobbyList { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin: 8px 0; font-size: 14px; min-width: 300px; }
+  #lobbyList div::before { content: '🐦 '; }
+  /* ---------------------------------------------------------------- HUD */
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  #hud.show { display: block; }
+  .hudBox { position: absolute; background: rgba(0,0,0,.35); border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 600; text-shadow: 0 1px 2px #000; }
+  #hpBox { left: max(10px, env(safe-area-inset-left)); top: 8px; width: 210px; }
+  #hpBar { height: 12px; background: rgba(255,255,255,.15); border-radius: 6px; overflow: hidden; margin-top: 4px; }
+  #hpFill { height: 100%; width: 100%; background: linear-gradient(90deg,#2dd36f,#7ae582); transition: width .15s; }
+  #topBox { left: 50%; top: 8px; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+  #stormText { color: #d8b4fe; }
+  #miniBox { right: max(10px, env(safe-area-inset-right)); top: 8px; padding: 4px; }
+  #minimap { display: block; width: 116px; height: 116px; border-radius: 8px; }
+  #ping { text-align: center; font-size: 11px; opacity: .8; margin-top: 2px; }
+  #modeBox { left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 12px; opacity: .85; }
+  #killfeed { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 140px; width: 220px; font-size: 12px; text-align: right; }
+  #killfeed div { background: rgba(0,0,0,.4); border-radius: 6px; padding: 3px 8px; margin-bottom: 3px; text-shadow: 0 1px 2px #000; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: 0; background: radial-gradient(ellipse at center, transparent 55%, rgba(255,0,0,.75) 100%); transition: opacity .12s; }
+  #stormVig { position: fixed; inset: 0; pointer-events: none; z-index: 9; opacity: 0; background: radial-gradient(ellipse at center, transparent 50%, rgba(120,40,220,.6) 100%); transition: opacity .4s; }
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 8; overflow: hidden; }
+  .label { position: absolute; transform: translate(-50%,-100%); text-align: center; font-size: 11px; font-weight: 700; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+  .label .hb { width: 44px; height: 5px; background: rgba(0,0,0,.5); border-radius: 3px; margin: 2px auto 0; overflow: hidden; }
+  .label .hf { height: 100%; background: #2dd36f; }
+  .floater { position: absolute; transform: translate(-50%,-50%); font-weight: 900; font-size: 15px; color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #f00; }
+  /* ---------------------------------------------------------------- touch controls */
+  #touch { position: fixed; inset: 0; z-index: 12; touch-action: none; display: none; }
+  #touch.show { display: block; }
+  .joy { display: none; position: fixed; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.10); border: 2px solid rgba(255,255,255,.35); pointer-events: none; }
+  .joy .knob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px; border-radius: 50%; background: rgba(255,255,255,.55); }
+  #joyMove { left: calc(28px + env(safe-area-inset-left)); bottom: 28px; }
+  #joyAim { right: calc(28px + env(safe-area-inset-right)); bottom: 28px; border-color: rgba(255,120,120,.5); }
+  #joyAim .knob { background: rgba(255,140,140,.6); }
+  .ctl { position: fixed; z-index: 14; border-radius: 50%; border: 0; color: #fff; font-weight: 800; font-size: 12px; text-shadow: 0 1px 2px #000; display: none; touch-action: none; }
+  .ctl.show { display: flex; align-items: center; justify-content: center; }
+  #btnFly { left: calc(165px + env(safe-area-inset-left)); bottom: 118px; width: 72px; height: 72px; background: radial-gradient(circle at 35% 35%, #8ecae6, #219ebc 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+  .ctl.alt { left: calc(258px + env(safe-area-inset-left)); width: 54px; height: 54px; font-size: 20px; background: radial-gradient(circle at 35% 35%, #cdb4db, #6d597a 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
+  #btnUp { bottom: 150px; } #btnDown { bottom: 88px; }
+  #btnSuper { right: calc(165px + env(safe-area-inset-right)); bottom: 108px; width: 92px; height: 92px; background: radial-gradient(circle at 35% 35%, #fff1a8, #f77f00 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); flex-direction: column; }
+  #btnSuper.cd { filter: grayscale(.8) brightness(.6); }
+  #btnSuper svg { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); transform: rotate(-90deg); pointer-events: none; }
+  #btnSuper .t { font-size: 10px; line-height: 1.1; }
+  #btnSuper .cdt { font-size: 18px; }
+  #rotate { position: fixed; inset: 0; z-index: 100; background: #0b1020; display: none; align-items: center; justify-content: center; font-size: 20px; text-align: center; padding: 20px; }
+  @media (orientation: portrait) and (max-width: 900px) { #rotate { display: flex; } }
+  #help { font-size: 11px; opacity: .7; text-align: center; margin-top: 6px; line-height: 1.4; }
+  #board { font-size: 13px; margin: 8px 0; text-align: left; }
+  #board div { display: flex; justify-content: space-between; gap: 20px; padding: 2px 0; }
+  #reconnect { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 30; background: rgba(0,0,0,.7); padding: 12px 20px; border-radius: 10px; display: none; }
+</style>
+<canvas id="game"></canvas>
+<div id="vignette"></div>
+<div id="stormVig"></div>
+<div id="labels"></div>
+
+<!-- =============================================================== HUD -->
+<div id="hud">
+  <div class="hudBox" id="hpBox"><span id="myName">Bird</span> <span id="hpText" style="float:right">100</span><div id="hpBar"><div id="hpFill"></div></div></div>
+  <div class="hudBox" id="topBox"><span id="aliveText">🐦 10 alive</span> &nbsp;|&nbsp; <span id="killText">☠ 0</span><br><span id="stormText">Storm in 30s</span></div>
+  <div class="hudBox" id="miniBox"><canvas id="minimap" width="116" height="116"></canvas><div id="ping">-- ms</div></div>
+  <div class="hudBox" id="modeBox">GROUND</div>
+  <div id="killfeed"></div>
+</div>
+
+<!-- =============================================================== touch controls -->
+<div id="touch"></div>
+<div class="joy" id="joyMove"><div class="knob"></div></div>
+<div class="joy" id="joyAim"><div class="knob"></div></div>
+<button class="ctl" id="btnFly">FLY UP</button>
+<button class="ctl alt" id="btnUp">▲</button>
+<button class="ctl alt" id="btnDown">▼</button>
+<button class="ctl" id="btnSuper">
+  <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="5"/><circle id="cdRing" cx="50" cy="50" r="47" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="295.3" stroke-dashoffset="0"/></svg>
+  <span class="cdt" id="cdText">SUPER</span><span class="t" id="superName">Feather Burst</span>
+</button>
+
+<!-- =============================================================== screens -->
+<div class="screen show" id="menu">
+  <div class="panel">
+    <h1>🐦 BIRD GAME SOLO</h1>
+    <div style="text-align:center;font-size:12px;opacity:.8;margin-bottom:6px">Offline practice: you against 9 bots, right in the browser. For online matches with friends use the server version.</div>
+    <div class="row"><input type="text" id="nameInput" maxlength="14" placeholder="Your bird name"><button class="btn" id="playBtn">PLAY</button></div>
+    <div id="birdScroll"><div id="birdInner"><canvas id="previewCanvas" width="744" height="104"></canvas><div id="cards"></div></div></div>
+    <div id="help">Phone: left stick walks/flies, FLY UP / LAND toggles flight (▲▼ change altitude), right stick aims &amp; auto-fires, drag empty screen to look around.<br>Desktop: WASD move · Space fly/land · Q/E down/up · hold left mouse to shoot at cursor · right-drag or arrows to look · F = super</div>
+  </div>
+</div>
+
+<div class="screen" id="lobby">
+  <div class="panel">
+    <h2 id="lobbyTitle">Waiting for birds… 1/10</h2>
+    <div id="lobbyList"></div>
+    <div style="text-align:center;font-size:14px">Match starts in <b id="lobbyCount">5</b>s (the other 9 birds are bots)</div>
+    <div class="row" style="margin-top:10px"><button class="btn secondary" id="leaveBtn">Leave</button></div>
+  </div>
+</div>
+
+<div class="screen" id="end">
+  <div class="panel" style="text-align:center;min-width:280px">
+    <h1 id="endTitle">VICTORY!</h1>
+    <div id="endSub" style="font-size:14px;opacity:.9"></div>
+    <div id="board"></div>
+    <div class="row"><button class="btn" id="againBtn">PLAY AGAIN</button><button class="btn secondary" id="watchBtn">WATCH</button></div>
+  </div>
+</div>
+
+<div id="rotate">📱 Rotate your phone to landscape to play</div>
+<div id="reconnect">Reconnecting…</div>
+
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* =============================================================================
+   LOCAL SERVER  (solo mode: the match simulation from server.js runs in this page.
+   Everything below the marker is a verbatim copy of server.js sections 1-7,
+   minus Node networking. To change balance for solo mode, edit BALANCE here.)
+   ============================================================================= */
+const LocalServer = (function () {
+  const WebSocket = { OPEN: 1 };
+  const TICK_RATE = 20;
+  const DT = 1 / TICK_RATE;
+const BALANCE = {
+  // Per-rarity stats. hp = max health, speed = ground speed, flySpeed = air speed,
+  // damage = per feather shot, fireRate = shots per second, superCooldown = seconds.
+  rarities: {
+    common:    { name: 'Common',     color: 0x9aa0a6, hp: 100, speed: 11.0, flySpeed: 18, damage: 12, fireRate: 5.0, superCooldown: 12,
+                 ability: 'featherBurst',   abilityName: 'Feather Burst',   abilityDesc: 'Fires a wide spread of 7 feathers.' },
+    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 120, speed: 12.0, flySpeed: 20, damage: 14, fireRate: 5.5, superCooldown: 11,
+                 ability: 'windDash',       abilityName: 'Wind Dash',       abilityDesc: 'Blast forward at high speed, hurting anyone you pass.' },
+    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, fireRate: 6.0, superCooldown: 14,
+                 ability: 'healingNest',    abilityName: 'Healing Nest',    abilityDesc: 'Drops a nest that heals every bird inside it for 5s.' },
+    epic:      { name: 'Epic',       color: 0xa855f7, hp: 165, speed: 13.0, flySpeed: 22, damage: 18, fireRate: 6.0, superCooldown: 13,
+                 ability: 'stormTalons',    abilityName: 'Storm Talons',    abilityDesc: 'Calls lightning down on the nearest enemy, damaging and slowing it.' },
+    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, fireRate: 6.5, superCooldown: 15,
+                 ability: 'shadowShield',   abilityName: 'Shadow Shield',   abilityDesc: 'Become invulnerable for 4s and reflect all damage back.' },
+    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 220, speed: 14.0, flySpeed: 24, damage: 24, fireRate: 7.0, superCooldown: 18,
+                 ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth', abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
+  },
+  projectile: {
+    speed: 70, ttl: 1.1,
+    hitRadiusGround: 1.8,   // easier to hit birds on the ground
+    hitRadiusFlying: 1.15,  // flying birds are harder to hit
+    diveBonus: 1.5,         // damage multiplier for a flying bird shooting down at a ground bird
+    diveHeight: 6,          // shooter must be this much higher than the target
+  },
+  abilities: {
+    featherBurst:   { count: 7, spreadDeg: 70, dmgMul: 0.9 },
+    windDash:       { speed: 110, duration: 0.35, contactDamage: 22 },
+    healingNest:    { radius: 9, duration: 5, healPerSec: 16 },
+    stormTalons:    { range: 45, damage: 65, slowDuration: 1.2 },
+    shadowShield:   { duration: 4, reflect: 1.0 },
+    phoenixRebirth: { radius: 15, damage: 85, reviveHp: 0.5, reviveDelay: 1.5 },
+  },
+  pickups: {
+    count: 44, chests: 8,
+    health: 40, bigHealth: 100,
+    speedMul: 1.6, speedDuration: 8,
+    shieldDuration: 5, bigShieldDuration: 9,
+    pickRadius: 2.4, chestRadius: 3.2,
+  },
+  storm: {
+    // Each phase: wait `delay` seconds, then shrink to `radius` over `shrink` seconds.
+    phases: [
+      { delay: 30, shrink: 20, radius: 200 },
+      { delay: 20, shrink: 20, radius: 135 },
+      { delay: 20, shrink: 15, radius: 85 },
+      { delay: 15, shrink: 15, radius: 45 },
+      { delay: 15, shrink: 15, radius: 15 },
+      { delay: 10, shrink: 20, radius: 0 },
+    ],
+    damageBase: 4, damagePerPhase: 3,   // damage per second outside the safe zone
+  },
+  match: {
+    maxPlayers: 10, lobbyCountdown: 5,
+    spawnHeight: 140, fallSpeed: 26, climbSpeed: 12, maxAltitude: 110,
+    initialSuperCooldown: 6, endScreenSeconds: 30,
+  },
+};
+const RARITY_KEYS = Object.keys(BALANCE.rarities);
+const BOT_NAMES = ['Pecky', 'Skyler', 'Talon', 'Nimbus', 'Robin', 'Zephyr', 'Kiwi', 'Falcon', 'Pip', 'Wren', 'Storm', 'Ash', 'Cinder', 'Gale', 'Echo', 'Blue'];
+
+/* =============================================================================
+   2. SHARED WORLD CODE  (identical copy lives in index.html - keep in sync)
+   ============================================================================= */
+const MAP = {
+  radius: 300, islandRadius: 250, waterLevel: 0,
+  lakes: [{ x: -90, z: 70, r: 45 }, { x: 120, z: 120, r: 35 }],
+  landmarks: { tower: { x: 140, z: -90 }, ruins: { x: -150, z: -60 }, bigTree: { x: 20, z: -20 } },
+};
+function hash2(x, z) {
+  let n = (Math.imul(x | 0, 374761393) + Math.imul(z | 0, 668265263)) | 0;
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  n ^= n >>> 16;
+  return (n >>> 0) / 4294967296;
+}
+function smoothstep(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  const a = hash2(xi, zi), b = hash2(xi + 1, zi), c = hash2(xi, zi + 1), d = hash2(xi + 1, zi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, z, oct) {
+  let sum = 0, amp = 1, f = 1, norm = 0;
+  for (let i = 0; i < oct; i++) { sum += vnoise(x * f, z * f) * amp; norm += amp; amp *= 0.5; f *= 2; }
+  return sum / norm;
+}
+function terrainHeight(x, z) {
+  const d = Math.hypot(x, z);
+  const edge = 1 - smoothstep(MAP.islandRadius * 0.72, MAP.islandRadius, d);
+  let h = fbm(x * 0.006 + 100, z * 0.006 + 100, 4) * 60 - 10;               // rolling hills
+  h += smoothstep(0.55, 0.68, vnoise(x * 0.012 + 40, z * 0.012 + 40)) * 18; // cliffs / plateaus
+  for (const l of MAP.lakes) h -= 24 * (1 - smoothstep(0, l.r, Math.hypot(x - l.x, z - l.z)));
+  return h * edge - (1 - edge) * 25;
+}
+function groundY(x, z) { return Math.max(terrainHeight(x, z), MAP.waterLevel); }
+
+// Moves one bird for `dt` seconds. inp = {mx,mz,vy,ax,az,fire}, P = per-bird movement params.
+function moveBird(b, inp, dt, P) {
+  let mx = inp.mx || 0, mz = inp.mz || 0;
+  const len = Math.hypot(mx, mz);
+  if (len > 1) { mx /= len; mz /= len; }
+  if (b.dashT > 0) {                       // Wind Dash overrides movement
+    b.x += b.dashX * P.dashSpeed * dt; b.z += b.dashZ * P.dashSpeed * dt;
+    b.dashT -= dt;
+  }
+  if (b.mode === 1) {                      // FLYING: smooth glide toward target velocity
+    const k = 1 - Math.exp(-4 * dt);
+    b.vx += (mx * P.flySpeed - b.vx) * k;
+    b.vz += (mz * P.flySpeed - b.vz) * k;
+    b.vy += ((inp.vy || 0) * P.climbSpeed - b.vy) * k;
+    b.x += b.vx * dt; b.z += b.vz * dt; b.y += b.vy * dt;
+    const g = groundY(b.x, b.z) + 1.5;
+    if (b.y < g) { b.y = g; if (b.vy < 0) b.vy = 0; }
+    if (b.y > P.maxAlt) { b.y = P.maxAlt; if (b.vy > 0) b.vy = 0; }
+  } else {                                 // GROUND: walk, and fall if above the terrain
+    b.vx = mx * P.speed; b.vz = mz * P.speed;
+    b.x += b.vx * dt; b.z += b.vz * dt;
+    const g = groundY(b.x, b.z);
+    if (b.y > g + 0.05) { b.y = Math.max(g, b.y - P.fallSpeed * dt); b.vy = -P.fallSpeed; }
+    else { b.y = g; b.vy = 0; }
+  }
+  const d = Math.hypot(b.x, b.z);          // keep everyone on the map
+  if (d > MAP.radius) { b.x *= MAP.radius / d; b.z *= MAP.radius / d; }
+  if (inp.fire && (inp.ax || inp.az)) b.yaw = Math.atan2(inp.ax, inp.az);
+  else if (len > 0.1) b.yaw = Math.atan2(mx, mz);
+}
+
+/* =============================================================================
+   Helpers
+   ============================================================================= */
+let nextId = 1;
+const uid = () => nextId++;
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const dist2 = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const dist3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+const r2 = (v) => Math.round(v * 100) / 100;
+const send = (ws, msg) => { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); };
+
+// Distance from point c to segment p0-p1 (used for swept projectile hits).
+function segDist(p0, p1, c) {
+  const dx = p1.x - p0.x, dy = p1.y - p0.y, dz = p1.z - p0.z;
+  const l2 = dx * dx + dy * dy + dz * dz;
+  let t = l2 > 0 ? ((c.x - p0.x) * dx + (c.y - p0.y) * dy + (c.z - p0.z) * dz) / l2 : 0;
+  t = clamp(t, 0, 1);
+  return Math.hypot(p0.x + dx * t - c.x, p0.y + dy * t - c.y, p0.z + dz * t - c.z);
+}
+
+/* =============================================================================
+   3. ROOM
+   ============================================================================= */
+class Room {
+  constructor() {
+    this.id = uid();
+    this.state = 'lobby';           // lobby | playing | ended
+    this.players = new Map();       // playerId -> { id, name, rarity, token, ws }
+    this.countdown = BALANCE.match.lobbyCountdown;
+    this.birds = new Map();         // birdId -> bird
+    this.projectiles = [];
+    this.pickups = new Map();
+    this.chests = new Map();
+    this.nests = [];
+    this.events = [];
+    this.time = 0;
+    this.storm = null;
+    this.endTimer = 0;
+    this.noHumanTimer = 0;
+  }
+
+  /* ---------- lobby ---------- */
+  addPlayer(client, name, rarity, token) {
+    const p = { id: client.id, name, rarity, token, ws: client.ws };
+    this.players.set(p.id, p);
+    client.room = this;
+    this.broadcastLobby();
+    if (this.players.size >= BALANCE.match.maxPlayers) this.start();
+  }
+  removePlayer(client) {
+    this.players.delete(client.id);
+    if (this.state === 'lobby') {
+      if (this.players.size === 0) this.countdown = BALANCE.match.lobbyCountdown;
+      this.broadcastLobby();
+    }
+  }
+  broadcastLobby() {
+    const list = [...this.players.values()].map(p => ({ id: p.id, name: p.name, rarity: p.rarity }));
+    this.broadcast({ type: 'lobby', players: list, countdown: Math.ceil(this.countdown), max: BALANCE.match.maxPlayers });
+  }
+  broadcast(msg) {
+    const s = JSON.stringify(msg);
+    for (const p of this.players.values()) if (p.ws && p.ws.readyState === WebSocket.OPEN) p.ws.send(s);
+  }
+  humanCount() { let n = 0; for (const p of this.players.values()) if (p.ws && p.ws.readyState === WebSocket.OPEN) n++; return n; }
+
+  /* ---------- match start ---------- */
+  makeBird(opts) {
+    const st = BALANCE.rarities[opts.rarity];
+    return {
+      id: uid(), name: opts.name, rarity: opts.rarity, isBot: !!opts.isBot, playerId: opts.playerId || null, token: opts.token || null,
+      x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, mode: 0,
+      hp: st.hp, maxHp: st.hp, alive: true, kills: 0, placement: 0,
+      input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0 },
+      lastFlySeq: 0, lastSuperSeq: 0,
+      fireCd: 0, superCd: BALANCE.match.initialSuperCooldown,
+      shieldT: 0, invulnT: 0, speedT: 0, stunT: 0, dashT: 0, dashX: 0, dashZ: 0, dashHit: null,
+      rebirth: false, reviveT: 0,
+      ai: null,
+    };
+  }
+  start() {
+    if (this.state !== 'lobby') return;
+    this.state = 'playing';
+    this.time = 0;
+    const n = BALANCE.match.maxPlayers;
+    const spawnPoints = [];
+    const a0 = Math.random() * Math.PI * 2;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (i / n) * Math.PI * 2 + rand(-0.15, 0.15), r = rand(150, 205);
+      spawnPoints.push({ x: Math.cos(a) * r, z: Math.sin(a) * r });
+    }
+    let i = 0;
+    for (const p of this.players.values()) {
+      const b = this.makeBird({ name: p.name, rarity: p.rarity, playerId: p.id, token: p.token });
+      this.placeBird(b, spawnPoints[i++]);
+      this.birds.set(b.id, b);
+      p.birdId = b.id;
+    }
+    const usedNames = new Set([...this.players.values()].map(p => p.name));
+    while (this.birds.size < n) {
+      let name; do { name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)]; } while (usedNames.has(name));
+      usedNames.add(name);
+      // Bots lean toward lower rarities so a lobby isn't ten legendaries.
+      const r = Math.random();
+      const rarity = RARITY_KEYS[r < 0.3 ? 0 : r < 0.55 ? 1 : r < 0.75 ? 2 : r < 0.88 ? 3 : r < 0.96 ? 4 : 5];
+      const b = this.makeBird({ name, rarity, isBot: true });
+      this.initBotAI(b);
+      this.placeBird(b, spawnPoints[i++]);
+      this.birds.set(b.id, b);
+    }
+    this.spawnPickups();
+    this.storm = {
+      cx: 0, cz: 0, r: MAP.islandRadius + 40, phase: -1, state: 'wait', timer: BALANCE.storm.phases[0].delay,
+      nextCx: 0, nextCz: 0, nextR: BALANCE.storm.phases[0].radius, startR: 0, startCx: 0, startCz: 0,
+    };
+    this.storm.phase = 0;
+    this.pickNextCenter();
+    this.broadcast(this.startMessage());
+  }
+  placeBird(b, sp) { b.x = sp.x; b.z = sp.z; b.y = BALANCE.match.spawnHeight; b.yaw = Math.atan2(-sp.x, -sp.z); }
+  startMessage() {
+    return {
+      type: 'start',
+      birds: [...this.birds.values()].map(b => ({ id: b.id, name: b.name, rarity: b.rarity, isBot: b.isBot, playerId: b.playerId, maxHp: b.maxHp })),
+      pickups: [...this.pickups.values()],
+      chests: [...this.chests.values()],
+      storm: this.stormSnapshot(),
+    };
+  }
+
+  /* ---------- pickups ---------- */
+  randomLandPoint(margin) {
+    for (let tries = 0; tries < 50; tries++) {
+      const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * (MAP.islandRadius - (margin || 20));
+      const x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (terrainHeight(x, z) > MAP.waterLevel + 1) return { x, z };
+    }
+    return { x: 0, z: 0 };
+  }
+  addPickup(type, x, z, big) {
+    const p = { id: uid(), type, x: r2(x), z: r2(z), y: r2(groundY(x, z) + 1), big: !!big };
+    this.pickups.set(p.id, p);
+    return p;
+  }
+  spawnPickups() {
+    const types = ['health', 'health', 'speed', 'shield', 'super'];
+    for (let i = 0; i < BALANCE.pickups.count; i++) {
+      const pt = this.randomLandPoint();
+      this.addPickup(types[i % types.length], pt.x, pt.z, false);
+    }
+    for (let i = 0; i < BALANCE.pickups.chests; i++) {
+      const pt = this.randomLandPoint(40);
+      const c = { id: uid(), x: r2(pt.x), z: r2(pt.z), y: r2(groundY(pt.x, pt.z)), opened: false };
+      this.chests.set(c.id, c);
+    }
+  }
+  applyPickup(b, p) {
+    const P = BALANCE.pickups;
+    switch (p.type) {
+      case 'health': b.hp = Math.min(b.maxHp, b.hp + (p.big ? P.bigHealth : P.health)); break;
+      case 'speed': b.speedT = P.speedDuration * (p.big ? 1.5 : 1); break;
+      case 'shield': b.shieldT = p.big ? P.bigShieldDuration : P.shieldDuration; break;
+      case 'super': b.superCd = 0; break;
+    }
+    this.pickups.delete(p.id);
+    this.events.push({ type: 'pickup', id: p.id, by: b.id, kind: p.type });
+  }
+  openChest(b, c) {
+    c.opened = true;
+    this.events.push({ type: 'chest', id: c.id, by: b.id });
+    const drops = ['health', 'shield', ['speed', 'super'][Math.floor(Math.random() * 2)]];
+    drops.forEach((t, i) => {
+      const a = (i / 3) * Math.PI * 2;
+      const p = this.addPickup(t, c.x + Math.cos(a) * 3, c.z + Math.sin(a) * 3, true);
+      this.events.push({ type: 'spawnPickup', pickup: p });
+    });
+  }
+
+  /* =============================================================================
+     4. SIMULATION
+     ============================================================================= */
+  update(dt) {
+    if (this.state === 'lobby') {
+      if (this.players.size > 0) {
+        this.countdown -= dt;
+        if (Math.ceil(this.countdown + dt) !== Math.ceil(this.countdown)) this.broadcastLobby();
+        if (this.countdown <= 0) this.start();
+      }
+      return;
+    }
+    if (this.state === 'ended') { this.endTimer -= dt; return; }
+
+    this.time += dt;
+    this.updateStorm(dt);
+    for (const b of this.birds.values()) this.updateBird(b, dt);
+    this.updateNests(dt);
+    this.updateProjectiles(dt);
+    this.checkEnd();
+
+    // Bots-only rooms (everyone left) get shut down.
+    this.noHumanTimer = this.humanCount() === 0 ? this.noHumanTimer + dt : 0;
+    if (this.noHumanTimer > 15) this.state = 'ended', this.endTimer = 0;
+
+    this.broadcast(this.snapshot());
+    this.events.length = 0;
+  }
+
+  updateBird(b, dt) {
+    if (!b.alive) {
+      if (b.reviveT > 0) { b.reviveT -= dt; if (b.reviveT <= 0) this.revive(b); }
+      return;
+    }
+    if (b.isBot) this.botThink(b, dt);
+    const st = BALANCE.rarities[b.rarity];
+    const inp = b.input;
+
+    // timers
+    b.shieldT = Math.max(0, b.shieldT - dt); b.invulnT = Math.max(0, b.invulnT - dt);
+    b.speedT = Math.max(0, b.speedT - dt); b.stunT = Math.max(0, b.stunT - dt);
+    b.fireCd -= dt; b.superCd = Math.max(0, b.superCd - dt);
+
+    // fly / land toggle (edge-triggered by a sequence number so no press is lost)
+    if (inp.flySeq !== b.lastFlySeq) {
+      b.lastFlySeq = inp.flySeq;
+      if (b.stunT <= 0) {
+        b.mode = b.mode ? 0 : 1;
+        if (b.mode === 1) { b.y = Math.max(b.y, groundY(b.x, b.z) + 1.5); b.vy = 6; }
+      }
+      this.events.push({ type: 'mode', b: b.id, mode: b.mode });
+    }
+
+    // movement
+    const slow = b.stunT > 0 ? 0.4 : 1, boost = b.speedT > 0 ? BALANCE.pickups.speedMul : 1;
+    moveBird(b, inp, dt, {
+      speed: st.speed * boost * slow, flySpeed: st.flySpeed * boost * slow,
+      climbSpeed: BALANCE.match.climbSpeed, fallSpeed: BALANCE.match.fallSpeed, maxAlt: BALANCE.match.maxAltitude,
+      dashSpeed: BALANCE.abilities.windDash.speed,
+    });
+    if (b.dashT > 0) this.dashContact(b);
+
+    // firing
+    if (inp.fire && b.fireCd <= 0 && b.stunT <= 0) { this.fire(b, null, 1); b.fireCd = 1 / st.fireRate; }
+
+    // super ability
+    if (inp.superSeq !== b.lastSuperSeq) {
+      b.lastSuperSeq = inp.superSeq;
+      if (b.superCd <= 0 && b.stunT <= 0 && this.useAbility(b)) b.superCd = st.superCooldown;
+    }
+
+    // storm damage
+    const S = this.storm;
+    if (Math.hypot(b.x - S.cx, b.z - S.cz) > S.r) {
+      this.applyDamage(b, (BALANCE.storm.damageBase + BALANCE.storm.damagePerPhase * S.phase) * dt, null, 'storm', true);
+      if (!b.alive) return;
+    }
+
+    // pickups & chests
+    for (const p of this.pickups.values()) {
+      if (Math.abs(p.x - b.x) < 3 && Math.abs(p.z - b.z) < 3 && dist3(p, b) < BALANCE.pickups.pickRadius) { this.applyPickup(b, p); break; }
+    }
+    for (const c of this.chests.values()) {
+      if (!c.opened && b.mode === 0 && dist2(c, b) < BALANCE.pickups.chestRadius) { this.openChest(b, c); break; }
+    }
+  }
+
+  updateStorm(dt) {
+    const S = this.storm, phases = BALANCE.storm.phases;
+    S.timer -= dt;
+    if (S.state === 'wait') {
+      if (S.timer <= 0) {
+        S.state = 'shrink'; S.timer = phases[S.phase].shrink;
+        S.startR = S.r; S.startCx = S.cx; S.startCz = S.cz;
+      }
+    } else {
+      const ph = phases[S.phase], t = 1 - clamp(S.timer / ph.shrink, 0, 1);
+      S.r = S.startR + (S.nextR - S.startR) * t;
+      S.cx = S.startCx + (S.nextCx - S.startCx) * t;
+      S.cz = S.startCz + (S.nextCz - S.startCz) * t;
+      if (S.timer <= 0) {
+        S.r = S.nextR; S.cx = S.nextCx; S.cz = S.nextCz;
+        if (S.phase < phases.length - 1) {
+          S.phase++; S.state = 'wait'; S.timer = phases[S.phase].delay;
+          this.pickNextCenter();
+        } else { S.state = 'done'; S.timer = 0; }
+      }
+    }
+  }
+  pickNextCenter() {
+    const S = this.storm, ph = BALANCE.storm.phases[S.phase];
+    S.nextR = ph.radius;
+    const a = Math.random() * Math.PI * 2, d = Math.random() * Math.max(0, S.r - ph.radius) * 0.8;
+    S.nextCx = S.cx + Math.cos(a) * d; S.nextCz = S.cz + Math.sin(a) * d;
+    const lim = MAP.islandRadius - 30 - ph.radius;      // keep the zone on the island
+    const dc = Math.hypot(S.nextCx, S.nextCz);
+    if (lim > 0 && dc > lim) { S.nextCx *= lim / dc; S.nextCz *= lim / dc; }
+  }
+  stormSnapshot() {
+    const S = this.storm;
+    return { cx: r2(S.cx), cz: r2(S.cz), r: r2(S.r), phase: S.phase, state: S.state, timer: r2(S.timer), nextCx: r2(S.nextCx), nextCz: r2(S.nextCz), nextR: S.nextR };
+  }
+
+  updateNests(dt) {
+    for (let i = this.nests.length - 1; i >= 0; i--) {
+      const n = this.nests[i]; n.t -= dt;
+      for (const b of this.birds.values()) {
+        if (b.alive && dist3(n, b) < BALANCE.abilities.healingNest.radius) b.hp = Math.min(b.maxHp, b.hp + BALANCE.abilities.healingNest.healPerSec * dt);
+      }
+      if (n.t <= 0) this.nests.splice(i, 1);
+    }
+  }
+
+  /* =============================================================================
+     5. COMBAT
+     ============================================================================= */
+  aimDir(b) {
+    let ax = b.input.ax, az = b.input.az;
+    const l = Math.hypot(ax, az);
+    if (l < 0.01) { ax = Math.sin(b.yaw); az = Math.cos(b.yaw); } else { ax /= l; az /= l; }
+    return { x: ax, z: az };
+  }
+  // Fires one feather. dirOverride = horizontal direction (for spread shots).
+  fire(b, dirOverride, dmgMul) {
+    const st = BALANCE.rarities[b.rarity], PR = BALANCE.projectile;
+    const aim = dirOverride || this.aimDir(b);
+    const origin = { x: b.x + aim.x * 1.2, y: b.y + 0.7, z: b.z + aim.z * 1.2 };
+    // Auto vertical aim: pick the nearest enemy roughly in the joystick direction and pitch toward it.
+    let dir = { x: aim.x, y: 0, z: aim.z }, best = null, bestD = 75;
+    for (const o of this.birds.values()) {
+      if (o === b || !o.alive) continue;
+      const dx = o.x - b.x, dz = o.z - b.z, d = Math.hypot(dx, dz);
+      if (d > bestD || d < 0.5) continue;
+      if ((dx * aim.x + dz * aim.z) / d < Math.cos(0.45)) continue;  // ~26 degree cone
+      best = o; bestD = d;
+    }
+    if (best) {
+      const dx = best.x - origin.x, dy = best.y + 0.5 - origin.y, dz = best.z - origin.z, l = Math.hypot(dx, dy, dz);
+      // keep the player's horizontal aim, borrow the pitch from the target
+      const pitch = dy / l, hl = Math.sqrt(Math.max(0.05, 1 - pitch * pitch));
+      dir = { x: aim.x * hl, y: pitch, z: aim.z * hl };
+    }
+    const p = { id: uid(), owner: b.id, x: origin.x, y: origin.y, z: origin.z, vx: dir.x * PR.speed, vy: dir.y * PR.speed, vz: dir.z * PR.speed, ttl: PR.ttl, dmg: st.damage * (dmgMul || 1) };
+    this.projectiles.push(p);
+    this.events.push({ type: 'shot', id: p.id, o: b.id, x: r2(p.x), y: r2(p.y), z: r2(p.z), vx: r2(p.vx), vy: r2(p.vy), vz: r2(p.vz) });
+  }
+  updateProjectiles(dt) {
+    const PR = BALANCE.projectile;
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const p = this.projectiles[i];
+      const prev = { x: p.x, y: p.y, z: p.z };
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.ttl -= dt;
+      let dead = p.ttl <= 0 || p.y < groundY(p.x, p.z);
+      if (!dead) {
+        const owner = this.birds.get(p.owner);
+        for (const b of this.birds.values()) {
+          if (!b.alive || b.id === p.owner) continue;
+          const radius = b.mode === 1 ? PR.hitRadiusFlying : PR.hitRadiusGround;
+          if (segDist(prev, p, { x: b.x, y: b.y + 0.6, z: b.z }) < radius) {
+            let dmg = p.dmg, dive = false;
+            if (owner && owner.mode === 1 && b.mode === 0 && owner.y - b.y > PR.diveHeight && p.vy < -8) { dmg *= PR.diveBonus; dive = true; }
+            this.applyDamage(b, dmg, owner, 'shot', false, { pid: p.id, dive });
+            dead = true; break;
+          }
+        }
+      }
+      if (dead) { this.projectiles.splice(i, 1); this.events.push({ type: 'pdead', id: p.id }); }
+    }
+  }
+  // silent = no per-hit event (storm ticks). info = { pid, dive, reflect }
+  applyDamage(target, dmg, attacker, cause, silent, info) {
+    if (!target.alive || dmg <= 0) return;
+    info = info || {};
+    if (target.invulnT > 0) {
+      if (attacker && attacker.alive && attacker !== target && !info.reflect) {
+        this.applyDamage(attacker, dmg * BALANCE.abilities.shadowShield.reflect, target, 'reflect', false, { reflect: true });
+      }
+      if (!silent) this.events.push({ type: 'hit', t: target.id, d: 0, blocked: true, pid: info.pid });
+      return;
+    }
+    if (target.shieldT > 0) { if (!silent) this.events.push({ type: 'hit', t: target.id, d: 0, blocked: true, pid: info.pid }); return; }
+    target.hp -= dmg;
+    if (!silent) this.events.push({ type: 'hit', t: target.id, d: Math.round(dmg), dive: !!info.dive, pid: info.pid, by: attacker ? attacker.id : null });
+    if (target.hp <= 0) this.kill(target, attacker, cause);
+  }
+  kill(victim, killer, cause) {
+    victim.hp = 0; victim.alive = false; victim.mode = 0; victim.dashT = 0;
+    const rebirth = victim.rebirth;
+    if (rebirth) { victim.rebirth = false; victim.reviveT = BALANCE.abilities.phoenixRebirth.reviveDelay; }
+    if (killer && killer !== victim) killer.kills++;
+    this.events.push({ type: 'kill', v: victim.id, k: killer ? killer.id : null, cause, rebirth });
+    if (!rebirth) {
+      victim.placement = this.aliveBirds().length + 1;
+      const client = this.clientForBird(victim);
+      if (client) send(client.ws, { type: 'eliminated', placement: victim.placement, killer: killer ? killer.name : null, cause, kills: victim.kills });
+    }
+  }
+  revive(b) {
+    b.alive = true; b.hp = b.maxHp * BALANCE.abilities.phoenixRebirth.reviveHp; b.invulnT = 1.5;
+    b.y = groundY(b.x, b.z) + 6;
+    this.events.push({ type: 'revive', b: b.id });
+  }
+  aliveBirds() { return [...this.birds.values()].filter(b => b.alive || b.reviveT > 0); }
+  clientForBird(b) {
+    if (!b.playerId) return null;
+    const p = this.players.get(b.playerId);
+    return p && p.ws ? { ws: p.ws } : null;
+  }
+
+  /* ---------- abilities ---------- */
+  useAbility(b) {
+    const st = BALANCE.rarities[b.rarity], A = BALANCE.abilities, aim = this.aimDir(b);
+    const ev = { type: 'ability', b: b.id, kind: st.ability, x: r2(b.x), y: r2(b.y), z: r2(b.z) };
+    switch (st.ability) {
+      case 'featherBurst': {
+        const base = Math.atan2(aim.x, aim.z), spread = A.featherBurst.spreadDeg * Math.PI / 180;
+        for (let i = 0; i < A.featherBurst.count; i++) {
+          const a = base - spread / 2 + spread * (i / (A.featherBurst.count - 1));
+          this.fire(b, { x: Math.sin(a), z: Math.cos(a) }, A.featherBurst.dmgMul);
+        }
+        break;
+      }
+      case 'windDash':
+        b.dashT = A.windDash.duration; b.dashX = aim.x; b.dashZ = aim.z; b.dashHit = new Set();
+        ev.dx = r2(aim.x); ev.dz = r2(aim.z);
+        break;
+      case 'healingNest':
+        this.nests.push({ x: b.x, y: b.y, z: b.z, t: A.healingNest.duration, owner: b.id });
+        break;
+      case 'stormTalons': {
+        let best = null, bd = A.stormTalons.range;
+        for (const o of this.birds.values()) { if (o !== b && o.alive) { const d = dist3(o, b); if (d < bd) { bd = d; best = o; } } }
+        if (!best) return false;                 // nothing in range: keep the super ready
+        ev.target = best.id; ev.tx = r2(best.x); ev.ty = r2(best.y); ev.tz = r2(best.z);
+        this.events.push(ev);
+        this.applyDamage(best, A.stormTalons.damage, b, 'lightning');
+        if (best.alive) best.stunT = A.stormTalons.slowDuration;
+        return true;
+      }
+      case 'shadowShield':
+        b.invulnT = A.shadowShield.duration;
+        break;
+      case 'phoenixRebirth': {
+        this.events.push(ev);
+        for (const o of this.birds.values()) {
+          if (o === b || !o.alive) continue;
+          const d = dist3(o, b);
+          if (d < A.phoenixRebirth.radius) this.applyDamage(o, A.phoenixRebirth.damage * (1 - 0.5 * d / A.phoenixRebirth.radius), b, 'phoenix');
+        }
+        b.rebirth = true;
+        return true;
+      }
+    }
+    this.events.push(ev);
+    return true;
+  }
+  dashContact(b) {
+    for (const o of this.birds.values()) {
+      if (o === b || !o.alive || b.dashHit.has(o.id)) continue;
+      if (dist3(o, b) < 2.6) { b.dashHit.add(o.id); this.applyDamage(o, BALANCE.abilities.windDash.contactDamage, b, 'dash'); }
+    }
+  }
+
+  /* =============================================================================
+     6. BOTS
+     ============================================================================= */
+  initBotAI(b) {
+    b.isBot = true;
+    b.ai = { thinkT: Math.random() * 0.3, target: null, goal: null, wanderT: 0, flyT: rand(3, 10), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, aimErr: 0 };
+  }
+  botThink(b, dt) {
+    const ai = b.ai, inp = b.input, S = this.storm, st = BALANCE.rarities[b.rarity];
+    ai.thinkT -= dt; ai.flyT -= dt; ai.strafeT -= dt;
+    if (ai.thinkT > 0) return;
+    ai.thinkT = 0.2;
+    if (ai.strafeT <= 0) { ai.strafe = -ai.strafe; ai.strafeT = rand(1.5, 4); }
+
+    // nearest enemy
+    let target = null, td = 70;
+    for (const o of this.birds.values()) { if (o !== b && o.alive) { const d = dist3(o, b); if (d < td) { td = d; target = o; } } }
+    ai.target = target;
+
+    // where to go
+    let goal = null;
+    const lowHp = b.hp < b.maxHp * 0.45;
+    if (lowHp) {
+      let best = null, bd = 45;
+      for (const p of this.pickups.values()) if (p.type === 'health') { const d = dist2(p, b); if (d < bd) { bd = d; best = p; } }
+      if (best) goal = { x: best.x, z: best.z };
+    }
+    const zoneR = S.state === 'shrink' ? S.nextR : S.r, zx = S.state === 'shrink' ? S.nextCx : S.cx, zz = S.state === 'shrink' ? S.nextCz : S.cz;
+    const dz = Math.hypot(b.x - zx, b.z - zz);
+    if (!goal && dz > zoneR - 12) {
+      const a = Math.random() * Math.PI * 2, r = Math.random() * Math.max(0, zoneR - 15) * 0.6;
+      goal = { x: zx + Math.cos(a) * r, z: zz + Math.sin(a) * r };
+    }
+    if (!goal && target) {
+      const dx = b.x - target.x, dzz = b.z - target.z, d = Math.hypot(dx, dzz) || 1;
+      const want = 18, push = td > want + 4 ? -1 : td < want - 4 ? 1 : 0;      // approach / back off
+      goal = { x: b.x + (dx / d) * push * 10 + (-dzz / d) * ai.strafe * 8, z: b.z + (dzz / d) * push * 10 + (dx / d) * ai.strafe * 8 };
+    }
+    if (!goal) {
+      ai.wanderT -= 0.2;
+      if (!ai.goal || ai.wanderT <= 0 || dist2(ai.goal, b) < 6) {
+        const a = Math.random() * Math.PI * 2, r = Math.random() * Math.max(10, zoneR - 15);
+        ai.goal = { x: zx + Math.cos(a) * r, z: zz + Math.sin(a) * r }; ai.wanderT = 8;
+      }
+      goal = ai.goal;
+    }
+    const gx = goal.x - b.x, gz = goal.z - b.z, gl = Math.hypot(gx, gz) || 1;
+    inp.mx = gx / gl; inp.mz = gz / gl;
+    if (gl < 1.5) { inp.mx = 0; inp.mz = 0; }
+
+    // shooting (with a bit of aim error so bots aren't perfect)
+    if (target && td < 60) {
+      const ang = Math.atan2(target.x - b.x, target.z - b.z) + rand(-0.12, 0.12);
+      inp.ax = Math.sin(ang); inp.az = Math.cos(ang); inp.fire = true;
+    } else inp.fire = false;
+
+    // flying decisions
+    if (b.mode === 0) {
+      const wantFly = (lowHp && target && Math.random() < 0.5) || (target && target.mode === 1 && Math.random() < 0.25) || (ai.flyT <= 0 && Math.random() < 0.3);
+      if (wantFly) { inp.flySeq++; ai.flyT = rand(6, 14); }
+    } else {
+      const g = groundY(b.x, b.z);
+      let desired = g + (target ? rand(10, 18) : 14);
+      if (target && target.mode === 0 && td < 30 && b.y - target.y > 8 && Math.random() < 0.5) desired = target.y + 4; // dive-bomb
+      inp.vy = clamp((desired - b.y) * 0.25, -1, 1);
+      if (ai.flyT <= 0 && Math.random() < 0.35 && !target) { inp.flySeq++; ai.flyT = rand(6, 14); }
+    }
+
+    // super ability
+    if (b.superCd <= 0) {
+      const wants = (st.ability === 'healingNest' && b.hp < b.maxHp * 0.55) ||
+                    (st.ability === 'shadowShield' && target && td < 25 && b.hp < b.maxHp * 0.7) ||
+                    (target && td < 22 && st.ability !== 'healingNest');
+      if (wants) inp.superSeq++;
+    }
+  }
+
+  /* ---------- end of match ---------- */
+  checkEnd() {
+    const alive = this.aliveBirds();
+    if (alive.length > 1) return;
+    this.state = 'ended'; this.endTimer = BALANCE.match.endScreenSeconds;
+    const w = alive[0] || null;
+    const rows = [...this.birds.values()].sort((a, b2) => (a.alive ? 0 : a.placement) - (b2.alive ? 0 : b2.placement));
+    this.broadcast({ type: 'end', winner: w ? { id: w.id, name: w.name, rarity: w.rarity, kills: w.kills } : null,
+      board: rows.map(b => ({ id: b.id, name: b.name, rarity: b.rarity, kills: b.kills, placement: b.alive ? 1 : b.placement })) });
+  }
+
+  /* ---------- snapshot ---------- */
+  snapshot() {
+    const birds = [];
+    for (const b of this.birds.values()) {
+      const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.input.fire ? 32 : 0) | (b.rebirth ? 64 : 0);
+      birds.push([b.id, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.mode, flags, b.alive ? 1 : 0, r2(b.superCd), b.kills]);
+    }
+    return { type: 'state', t: r2(this.time), birds, storm: this.stormSnapshot(), ev: this.events, alive: this.aliveBirds().length };
+  }
+}
+
+/* =============================================================================
+   7. NETWORKING
+   ============================================================================= */
+const rooms = new Map();
+const clients = new Map();   // ws -> client
+
+function findLobbyRoom() {
+  for (const r of rooms.values()) if (r.state === 'lobby' && r.players.size < BALANCE.match.maxPlayers) return r;
+  const r = new Room(); rooms.set(r.id, r); return r;
+}
+function leaveRoom(client) {
+  const room = client.room;
+  if (!room) return;
+  if (room.state === 'playing') {
+    // Hand the bird over to a bot; the player can reconnect with their token.
+    const p = room.players.get(client.id);
+    if (p) { p.ws = null; const b = room.birds.get(p.birdId); if (b && b.alive && !b.isBot) { room.initBotAI(b); room.events.push({ type: 'botTakeover', b: b.id }); } }
+  } else {
+    room.removePlayer(client);
+  }
+  client.room = null; client.bird = null;
+  if (room.players.size === 0 || (room.state === 'ended' && room.humanCount() === 0)) rooms.delete(room.id);
+}
+function tryReconnect(client, token) {
+  if (!token) return false;
+  for (const room of rooms.values()) {
+    if (room.state !== 'playing') continue;
+    for (const p of room.players.values()) {
+      if (p.token !== token) continue;
+      const b = room.birds.get(p.birdId);
+      if (!b || (!b.alive && b.reviveT <= 0)) return false;   // nothing to come back to
+      // move player entry to the new client id
+      room.players.delete(p.id);
+      p.id = client.id; p.ws = client.ws; room.players.set(p.id, p);
+      b.playerId = client.id; client.room = room; client.bird = b;
+      if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq }; }
+      send(client.ws, { type: 'welcome', id: client.id, token, balance: BALANCE, birdId: b.id, name: p.name, rarity: p.rarity, reconnected: true });
+      send(client.ws, room.startMessage());
+      return true;
+    }
+  }
+  return false;
+}
+
+function handleMessage(client, msg) {
+  switch (msg.type) {
+    case 'join': {
+      const name = String(msg.name || 'Bird').replace(/[^\w \-]/g, '').trim().slice(0, 14) || 'Bird';
+      const rarity = RARITY_KEYS.includes(msg.rarity) ? msg.rarity : 'common';
+      const token = typeof msg.token === 'string' && msg.token.length <= 48 ? msg.token : null;
+      leaveRoom(client);
+      if (!msg.fresh && tryReconnect(client, token)) return;
+      const newToken = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+      const room = findLobbyRoom();
+      send(client.ws, { type: 'welcome', id: client.id, token: newToken, balance: BALANCE, name, rarity });
+      room.addPlayer(client, name, rarity, newToken);
+      break;
+    }
+    case 'input': {
+      const room = client.room;
+      if (!room || room.state !== 'playing') return;
+      const p = room.players.get(client.id);
+      const b = p && room.birds.get(p.birdId);
+      if (!b || b.isBot) return;
+      const i = b.input;
+      i.mx = clamp(+msg.mx || 0, -1, 1); i.mz = clamp(+msg.mz || 0, -1, 1); i.vy = clamp(+msg.vy || 0, -1, 1);
+      i.ax = clamp(+msg.ax || 0, -1, 1); i.az = clamp(+msg.az || 0, -1, 1);
+      i.fire = !!msg.fire; i.flySeq = msg.flySeq | 0; i.superSeq = msg.superSeq | 0;
+      break;
+    }
+    case 'resume': {   // page reloaded mid-match: rejoin the same bird if it is still in play
+      if (client.room) return;
+      if (!tryReconnect(client, typeof msg.token === 'string' ? msg.token : null)) send(client.ws, { type: 'noResume' });
+      break;
+    }
+    case 'ping': send(client.ws, { type: 'pong', t: msg.t }); break;
+    case 'leave': leaveRoom(client); break;
+  }
+}
+
+
+// --- main loop
+setInterval(() => {
+  for (const room of rooms.values()) {
+    try { room.update(DT); } catch (e) { console.error('room error', e); }
+    if (room.state === 'ended' && room.endTimer <= 0) {
+      for (const p of room.players.values()) if (p.ws) { const c = clients.get(p.ws); if (c && c.room === room) { c.room = null; c.bird = null; } }
+      rooms.delete(room.id);
+    }
+  }
+}, 1000 / TICK_RATE);
+
+
+  return {
+    open(onMessage) {
+      const ws = { readyState: 1, send(s) { setTimeout(() => onMessage(s), 0); }, close() { ws.readyState = 3; leaveRoom(client); clients.delete(ws); } };
+      const client = { id: uid(), ws, room: null, bird: null };
+      clients.set(ws, client);
+      ws.receive = (s) => { let msg; try { msg = JSON.parse(s); } catch { return; } if (msg && typeof msg.type === 'string') handleMessage(client, msg); };
+      return ws;
+    },
+  };
+})();
+
+/* =============================================================================
+   1. SHARED WORLD CODE  (must match server.js exactly)
+   ============================================================================= */
+const MAP = {
+  radius: 300, islandRadius: 250, waterLevel: 0,
+  lakes: [{ x: -90, z: 70, r: 45 }, { x: 120, z: 120, r: 35 }],
+  landmarks: { tower: { x: 140, z: -90 }, ruins: { x: -150, z: -60 }, bigTree: { x: 20, z: -20 } },
+};
+function hash2(x, z) {
+  let n = (Math.imul(x | 0, 374761393) + Math.imul(z | 0, 668265263)) | 0;
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  n ^= n >>> 16;
+  return (n >>> 0) / 4294967296;
+}
+function smoothstep(a, b, x) { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); }
+function vnoise(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  const a = hash2(xi, zi), b = hash2(xi + 1, zi), c = hash2(xi, zi + 1), d = hash2(xi + 1, zi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+function fbm(x, z, oct) {
+  let sum = 0, amp = 1, f = 1, norm = 0;
+  for (let i = 0; i < oct; i++) { sum += vnoise(x * f, z * f) * amp; norm += amp; amp *= 0.5; f *= 2; }
+  return sum / norm;
+}
+function terrainHeight(x, z) {
+  const d = Math.hypot(x, z);
+  const edge = 1 - smoothstep(MAP.islandRadius * 0.72, MAP.islandRadius, d);
+  let h = fbm(x * 0.006 + 100, z * 0.006 + 100, 4) * 60 - 10;
+  h += smoothstep(0.55, 0.68, vnoise(x * 0.012 + 40, z * 0.012 + 40)) * 18;
+  for (const l of MAP.lakes) h -= 24 * (1 - smoothstep(0, l.r, Math.hypot(x - l.x, z - l.z)));
+  return h * edge - (1 - edge) * 25;
+}
+function groundY(x, z) { return Math.max(terrainHeight(x, z), MAP.waterLevel); }
+function moveBird(b, inp, dt, P) {
+  let mx = inp.mx || 0, mz = inp.mz || 0;
+  const len = Math.hypot(mx, mz);
+  if (len > 1) { mx /= len; mz /= len; }
+  if (b.dashT > 0) { b.x += b.dashX * P.dashSpeed * dt; b.z += b.dashZ * P.dashSpeed * dt; b.dashT -= dt; }
+  if (b.mode === 1) {
+    const k = 1 - Math.exp(-4 * dt);
+    b.vx += (mx * P.flySpeed - b.vx) * k;
+    b.vz += (mz * P.flySpeed - b.vz) * k;
+    b.vy += ((inp.vy || 0) * P.climbSpeed - b.vy) * k;
+    b.x += b.vx * dt; b.z += b.vz * dt; b.y += b.vy * dt;
+    const g = groundY(b.x, b.z) + 1.5;
+    if (b.y < g) { b.y = g; if (b.vy < 0) b.vy = 0; }
+    if (b.y > P.maxAlt) { b.y = P.maxAlt; if (b.vy > 0) b.vy = 0; }
+  } else {
+    b.vx = mx * P.speed; b.vz = mz * P.speed;
+    b.x += b.vx * dt; b.z += b.vz * dt;
+    const g = groundY(b.x, b.z);
+    if (b.y > g + 0.05) { b.y = Math.max(g, b.y - P.fallSpeed * dt); b.vy = -P.fallSpeed; }
+    else { b.y = g; b.vy = 0; }
+  }
+  const d = Math.hypot(b.x, b.z);
+  if (d > MAP.radius) { b.x *= MAP.radius / d; b.z *= MAP.radius / d; }
+  if (inp.fire && (inp.ax || inp.az)) b.yaw = Math.atan2(inp.ax, inp.az);
+  else if (len > 0.1) b.yaw = Math.atan2(mx, mz);
+}
+
+/* =============================================================================
+   2. STATE, DOM, HELPERS
+   ============================================================================= */
+const $ = (id) => document.getElementById(id);
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 1;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const lerpAngle = (a, b, t) => { let d = b - a; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; return a + d * t; };
+const RARITY_ORDER = ['common', 'rare', 'superRare', 'epic', 'mythic', 'legendary'];
+// Fallback balance so the menu renders before the server answers; replaced by the server's table on 'welcome'.
+let BALANCE = { rarities: {
+  common:    { name: 'Common', color: 0x9aa0a6, hp: 100, speed: 11, flySpeed: 18, damage: 12, fireRate: 5, superCooldown: 12, abilityName: 'Feather Burst', abilityDesc: 'Fires a wide spread of 7 feathers.', ability: 'featherBurst' },
+  rare:      { name: 'Rare', color: 0x3b82f6, hp: 120, speed: 12, flySpeed: 20, damage: 14, fireRate: 5.5, superCooldown: 11, abilityName: 'Wind Dash', abilityDesc: 'Blast forward at high speed, hurting anyone you pass.', ability: 'windDash' },
+  superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, fireRate: 6, superCooldown: 14, abilityName: 'Healing Nest', abilityDesc: 'Drops a nest that heals every bird inside it for 5s.', ability: 'healingNest' },
+  epic:      { name: 'Epic', color: 0xa855f7, hp: 165, speed: 13, flySpeed: 22, damage: 18, fireRate: 6, superCooldown: 13, abilityName: 'Storm Talons', abilityDesc: 'Calls lightning down on the nearest enemy, damaging and slowing it.', ability: 'stormTalons' },
+  mythic:    { name: 'Mythic', color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, fireRate: 6.5, superCooldown: 15, abilityName: 'Shadow Shield', abilityDesc: 'Become invulnerable for 4s and reflect all damage back.', ability: 'shadowShield' },
+  legendary: { name: 'Legendary', color: 0xf59e0b, hp: 220, speed: 14, flySpeed: 24, damage: 24, fireRate: 7, superCooldown: 18, abilityName: 'Phoenix Rebirth', abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.', ability: 'phoenixRebirth' },
+}, match: { climbSpeed: 12, fallSpeed: 26, maxAltitude: 110 }, abilities: { windDash: { speed: 110 } }, pickups: { speedMul: 1.6 }, projectile: { speed: 70, ttl: 1.1 } };
+
+const G = {                      // global client game state
+  phase: 'menu',                 // menu | lobby | playing | ended
+  myId: null, myBirdId: null, token: localStorage.getItem('bgu_token') || null,
+  name: localStorage.getItem('bgu_name') || '', rarity: localStorage.getItem('bgu_rarity') || 'common',
+  ents: new Map(), projectiles: new Map(), pickups: new Map(), chests: new Map(), effects: [],
+  storm: null, alive: 10, ping: 0, spectateId: null, eliminated: false,
+  me: null,                      // predicted local bird
+  input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0 },
+  modeOverrideUntil: 0, lastStormTick: 0,
+};
+
+/* =============================================================================
+   3. SOUND (Web Audio, no files)
+   ============================================================================= */
+const SFX = {
+  ctx: null,
+  init() { try { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); } catch (e) {} },
+  tone(f, dur, type, vol, slide) {
+    if (!this.ctx) return; const c = this.ctx, o = c.createOscillator(), g = c.createGain();
+    o.type = type || 'square'; o.frequency.setValueAtTime(f, c.currentTime);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, f + slide), c.currentTime + dur);
+    g.gain.setValueAtTime(vol || 0.1, c.currentTime); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+    o.connect(g).connect(c.destination); o.start(); o.stop(c.currentTime + dur);
+  },
+  noise(dur, vol, lp) {
+    if (!this.ctx) return; const c = this.ctx, n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = c.createBufferSource(), g = c.createGain(), f = c.createBiquadFilter();
+    s.buffer = buf; f.type = 'lowpass'; f.frequency.value = lp || 1200; g.gain.value = vol || 0.2;
+    s.connect(f).connect(g).connect(c.destination); s.start();
+  },
+  play(n) {
+    switch (n) {
+      case 'shoot': this.tone(880, 0.07, 'square', 0.05, -500); break;
+      case 'hit': this.tone(260, 0.08, 'sawtooth', 0.08, -120); break;
+      case 'hurt': this.noise(0.15, 0.25, 800); this.tone(140, 0.2, 'triangle', 0.2, -60); break;
+      case 'pickup': this.tone(700, 0.08, 'sine', 0.15); setTimeout(() => this.tone(1050, 0.12, 'sine', 0.15), 80); break;
+      case 'super': this.tone(200, 0.5, 'sawtooth', 0.15, 1000); this.noise(0.4, 0.15, 3000); break;
+      case 'death': this.tone(400, 0.6, 'square', 0.15, -350); this.noise(0.5, 0.3, 600); break;
+      case 'win': [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => this.tone(f, 0.25, 'triangle', 0.2), i * 130)); break;
+      case 'storm': this.tone(70, 0.25, 'sawtooth', 0.12); break;
+      case 'fly': this.noise(0.35, 0.2, 2000); break;
+      case 'land': this.tone(90, 0.15, 'triangle', 0.15, -40); break;
+      case 'lightning': this.noise(0.4, 0.4, 5000); this.tone(60, 0.5, 'sawtooth', 0.2); break;
+      case 'chest': this.tone(500, 0.1, 'triangle', 0.15); setTimeout(() => this.tone(750, 0.1, 'triangle', 0.15), 100); setTimeout(() => this.tone(1000, 0.2, 'triangle', 0.15), 200); break;
+      case 'revive': [400, 600, 900, 1300].forEach((f, i) => setTimeout(() => this.tone(f, 0.3, 'sine', 0.2), i * 90)); break;
+    }
+  },
+};
+
+/* =============================================================================
+   4. THREE.JS SETUP + WORLD
+   ============================================================================= */
+const canvas = $('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x8ecdf0);
+scene.fog = new THREE.Fog(0xbfdcf2, 140, 460);
+const camera = new THREE.PerspectiveCamera(70, 1, 0.5, 700);
+const cam = { yaw: 0, pitch: 0.42, dist: 13 };
+
+const hemi = new THREE.HemisphereLight(0xbfe3ff, 0x5a7a3a, 0.9); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d6, 1.6); sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.near = 10; sun.shadow.camera.far = 400;
+sun.shadow.camera.left = sun.shadow.camera.bottom = -70; sun.shadow.camera.right = sun.shadow.camera.top = 70;
+sun.shadow.bias = -0.002; scene.add(sun); scene.add(sun.target);
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  layoutJoysticks();
+}
+window.addEventListener('resize', resize);
+
+const MAT = {
+  bird: {}, beak: new THREE.MeshLambertMaterial({ color: 0xffa62b }), eye: new THREE.MeshBasicMaterial({ color: 0x111111 }),
+  proj: {}, wood: new THREE.MeshLambertMaterial({ color: 0x6b4423 }), stone: new THREE.MeshLambertMaterial({ color: 0x8d8b85 }),
+  leaf: new THREE.MeshLambertMaterial({ color: 0x3e9a45 }),
+};
+
+// --- terrain
+function buildTerrain() {
+  const size = MAP.radius * 2 + 40, seg = 128;
+  const geo = new THREE.PlaneGeometry(size, size, seg, seg); geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position, colors = new Float32Array(pos.count * 3), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i), h = terrainHeight(x, z);
+    pos.setY(i, h);
+    const n = hash2(i, 7) * 0.08;
+    if (h < MAP.waterLevel + 1.2) c.setRGB(0.82 + n, 0.74 + n, 0.5);        // sand
+    else if (h > 38) c.setRGB(0.55 + n, 0.53 + n, 0.5 + n);                   // rock
+    else if (h > 30) c.setRGB(0.45 + n, 0.55 + n, 0.35);                      // dry grass
+    else c.setRGB(0.28 + n, 0.62 + n * 0.5, 0.25);                             // grass
+    colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  // steep slopes -> rock color
+  const nrm = geo.attributes.normal;
+  for (let i = 0; i < pos.count; i++) if (nrm.getY(i) < 0.72 && pos.getY(i) > 1.2) { colors[i * 3] = 0.5; colors[i * 3 + 1] = 0.47; colors[i * 3 + 2] = 0.44; }
+  geo.attributes.color.needsUpdate = true;
+  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true })); m.receiveShadow = true; scene.add(m);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), new THREE.MeshLambertMaterial({ color: 0x2f7fc9, transparent: true, opacity: 0.82 }));
+  water.rotation.x = -Math.PI / 2; water.position.y = MAP.waterLevel; scene.add(water);
+  G.water = water;
+}
+// --- forests & rocks (instanced, placed deterministically from the hash)
+function buildScatter() {
+  const trees = [], rocks = [], LM = MAP.landmarks;
+  const nearLandmark = (x, z) => Object.values(LM).some(l => Math.hypot(l.x - x, l.z - z) < 24);
+  for (let gx = -240; gx <= 240; gx += 11) for (let gz = -240; gz <= 240; gz += 11) {
+    const r = hash2(gx * 7 + 3, gz * 13 + 5);
+    const x = gx + (hash2(gx, gz) - 0.5) * 9, z = gz + (hash2(gz, gx) - 0.5) * 9, h = terrainHeight(x, z);
+    if (h < 2 || Math.hypot(x, z) > 235 || nearLandmark(x, z)) continue;
+    const forest = fbm(x * 0.01 + 500, z * 0.01 + 500, 2);        // clumps of forest
+    const slope = Math.abs(terrainHeight(x + 2, z) - h) + Math.abs(terrainHeight(x, z + 2) - h);
+    if (r < forest * 0.85 && slope < 2.2 && h < 34) trees.push({ x, y: h, z, s: 0.8 + hash2(gx + 9, gz) * 0.7 });
+    else if (r > 0.93 && (h > 30 || slope > 2)) rocks.push({ x, y: h, z, s: 0.8 + hash2(gx, gz + 9) * 1.6, r: hash2(gx + 1, gz + 1) * 6 });
+  }
+  const dummy = new THREE.Object3D(), col = new THREE.Color();
+  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.28, 0.5, 3.2, 5), MAT.wood, trees.length);
+  const canopy = new THREE.InstancedMesh(new THREE.ConeGeometry(2.6, 6.5, 6), new THREE.MeshLambertMaterial({ color: 0xffffff }), trees.length);
+  trees.forEach((t, i) => {
+    dummy.position.set(t.x, t.y + 1.5 * t.s, t.z); dummy.scale.setScalar(t.s); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); trunk.setMatrixAt(i, dummy.matrix);
+    dummy.position.y = t.y + (3 + 3) * t.s; dummy.updateMatrix(); canopy.setMatrixAt(i, dummy.matrix);
+    canopy.setColorAt(i, col.setHSL(0.3 + hash2(i, 3) * 0.08, 0.55, 0.3 + hash2(i, 4) * 0.15));
+  });
+  trunk.castShadow = canopy.castShadow = true; canopy.receiveShadow = true;
+  scene.add(trunk, canopy);
+  const rock = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1.3, 0), MAT.stone, rocks.length);
+  rocks.forEach((r, i) => { dummy.position.set(r.x, r.y + 0.6 * r.s, r.z); dummy.scale.set(r.s * 1.4, r.s, r.s); dummy.rotation.set(0, r.r, 0.2); dummy.updateMatrix(); rock.setMatrixAt(i, dummy.matrix); });
+  rock.castShadow = true; scene.add(rock);
+  // clouds
+  const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+  G.clouds = [];
+  for (let i = 0; i < 14; i++) {
+    const g = new THREE.Group();
+    for (let k = 0; k < 4; k++) { const s = new THREE.Mesh(new THREE.SphereGeometry(6 + Math.random() * 6, 7, 5), cloudMat); s.position.set(k * 7 - 10, Math.random() * 3, Math.random() * 6 - 3); s.scale.y = 0.55; g.add(s); }
+    g.position.set((Math.random() - 0.5) * 600, 120 + Math.random() * 30, (Math.random() - 0.5) * 600); scene.add(g); G.clouds.push(g);
+  }
+}
+// --- landmarks: tower, ruins, big tree
+function buildLandmarks() {
+  const LM = MAP.landmarks, add = (m, x, z, yOff) => { m.position.set(x, groundY(x, z) + (yOff || 0), z); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m; };
+  const t = LM.tower;
+  add(new THREE.Mesh(new THREE.CylinderGeometry(5, 6.5, 34, 10), MAT.stone), t.x, t.z, 17);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 2, 10), MAT.stone), t.x, t.z, 35);
+  add(new THREE.Mesh(new THREE.ConeGeometry(6, 8, 10), new THREE.MeshLambertMaterial({ color: 0x9b2d30 })), t.x, t.z, 40);
+  const r = LM.ruins;
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * Math.PI * 2, h = 4 + hash2(i, 77) * 10, x = r.x + Math.cos(a) * 12, z = r.z + Math.sin(a) * 12;
+    add(new THREE.Mesh(new THREE.CylinderGeometry(1, 1.2, h, 6), MAT.stone), x, z, h / 2);
+  }
+  add(new THREE.Mesh(new THREE.BoxGeometry(14, 1.5, 4), MAT.stone), r.x, r.z, 0.7).rotation.y = 0.6;
+  const b = LM.bigTree;
+  add(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.6, 28, 8), MAT.wood), b.x, b.z, 14);
+  add(new THREE.Mesh(new THREE.SphereGeometry(15, 10, 8), new THREE.MeshLambertMaterial({ color: 0x2f8f3d })), b.x, b.z, 30).scale.y = 0.75;
+  for (let i = 0; i < 4; i++) { const a = i * 1.57 + 0.5; const br = add(new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.2, 12, 6), MAT.wood), b.x + Math.cos(a) * 5, b.z + Math.sin(a) * 5, 24); br.rotation.set(Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9); }
+}
+// --- storm dome + next-zone ring
+let stormDome, stormRing;
+function buildStorm() {
+  stormDome = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 260, 64, 1, true), new THREE.MeshBasicMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.28, side: THREE.DoubleSide, depthWrite: false }));
+  stormRing = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 260, 64, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+  stormDome.position.y = stormRing.position.y = 100; scene.add(stormDome, stormRing);
+}
+
+/* =============================================================================
+   5. BIRD MODELS, PICKUPS, EFFECTS
+   ============================================================================= */
+function birdMat(rarity) {
+  if (!MAT.bird[rarity]) {
+    const c = new THREE.Color(BALANCE.rarities[rarity].color);
+    MAT.bird[rarity] = { body: new THREE.MeshLambertMaterial({ color: c.clone().lerp(new THREE.Color(0xffffff), 0.22), emissive: c, emissiveIntensity: 0.12 }),
+                         aura: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: rarity === 'common' ? 0.06 : 0.14, depthWrite: false, side: THREE.BackSide }),
+                         ring: new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.6, depthWrite: false }) };
+  }
+  return MAT.bird[rarity];
+}
+function createBirdMesh(rarity) {
+  const m = { ...birdMat(rarity) }, g = new THREE.Group();
+  m.body = m.body.clone();   // own copy so the damage flash only lights up this bird
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.9, 9, 7), m.body); body.scale.set(1, 0.85, 1.3); body.position.y = 0.6; body.castShadow = true; g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), m.body); head.position.set(0, 1.35, 0.85); head.castShadow = true; g.add(head);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.55, 5), MAT.beak); beak.rotation.x = Math.PI / 2; beak.position.set(0, 1.3, 1.5); g.add(beak);
+  for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 4), MAT.eye); e.position.set(s * 0.28, 1.5, 1.25); g.add(e); }
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.9), m.body); tail.position.set(0, 0.7, -1.4); tail.rotation.x = 0.3; g.add(tail);
+  const wings = [];
+  for (const s of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.position.set(s * 0.55, 0.85, 0.1);
+    const w = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 1.0), m.body); w.position.x = s * 1.0; w.castShadow = true; pivot.add(w);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.7), m.body); tip.position.set(s * 2.2, 0, -0.1); pivot.add(tip);
+    g.add(pivot); wings.push(pivot);
+  }
+  const aura = new THREE.Mesh(new THREE.SphereGeometry(1.9, 10, 8), m.aura); aura.position.y = 0.8; g.add(aura);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.75, 24), m.ring); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; g.add(ring);
+  const shield = new THREE.Mesh(new THREE.SphereGeometry(2.1, 12, 8), new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.35, depthWrite: false })); shield.position.y = 0.8; shield.visible = false; g.add(shield);
+  const shadow = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0x1a0030, transparent: true, opacity: 0.6, depthWrite: false })); shadow.position.y = 0.8; shadow.visible = false; g.add(shadow);
+  const aimArrow = new THREE.Mesh(new THREE.ConeGeometry(0.45, 5, 4), m.ring); aimArrow.rotation.x = Math.PI / 2; aimArrow.position.set(0, 0.3, 3.5); aimArrow.visible = false;
+  const aimPivot = new THREE.Group(); aimPivot.add(aimArrow); g.add(aimPivot);
+  g.userData = { wings, body, head, mats: [m.body], shield, shadow, aimPivot, aimArrow, flap: Math.random() * 10 };
+  return g;
+}
+const PICK_GEO = {
+  health: () => { const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({ color: 0xff3b5c, emissive: 0x661020 }); g.add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 0.5), m)); g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.4, 0.5), m)); return g; },
+  speed:  () => new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.4, 5), new THREE.MeshLambertMaterial({ color: 0xffe066, emissive: 0x665500 })),
+  shield: () => new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), new THREE.MeshLambertMaterial({ color: 0x60a5fa, emissive: 0x1e3a8a })),
+  super:  () => new THREE.Mesh(new THREE.OctahedronGeometry(0.85, 0), new THREE.MeshLambertMaterial({ color: 0xc084fc, emissive: 0x5b21b6 })),
+};
+function addPickupMesh(p) {
+  const m = PICK_GEO[p.type](); if (p.big) m.scale.setScalar(1.45);
+  m.position.set(p.x, p.y, p.z); scene.add(m); G.pickups.set(p.id, { ...p, mesh: m });
+}
+function addChestMesh(c) {
+  const g = new THREE.Group(), body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.2, 1.4), new THREE.MeshLambertMaterial({ color: 0x8b5a2b })); body.position.y = 0.6; body.castShadow = true;
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 1.4), new THREE.MeshLambertMaterial({ color: 0xd4a017, emissive: 0x554000 })); lid.position.set(0, 1.45, 0);
+  g.add(body, lid); g.position.set(c.x, c.y, c.z); scene.add(g); G.chests.set(c.id, { ...c, mesh: g, lid });
+}
+// generic timed effect: { mesh, t, dur, update(fx, k) }
+function addEffect(mesh, dur, update) { scene.add(mesh); G.effects.push({ mesh, t: 0, dur, update }); }
+function fxBurst(x, y, z, color, count, speed, size) {   // feather / spark burst
+  const geo = new THREE.BufferGeometry(), n = count || 16, pos = new Float32Array(n * 3), vel = [];
+  for (let i = 0; i < n; i++) { pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z; const a = Math.random() * 6.28, b = Math.random() * 3.14; const s = (speed || 8) * (0.5 + Math.random()); vel.push(Math.cos(a) * Math.sin(b) * s, Math.abs(Math.cos(b)) * s, Math.sin(a) * Math.sin(b) * s); }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color, size: size || 0.5, transparent: true, depthWrite: false }));
+  addEffect(pts, 0.9, (fx, k, dt) => { const p = fx.mesh.geometry.attributes.position; for (let i = 0; i < n; i++) { vel[i * 3 + 1] -= 20 * dt; p.array[i * 3] += vel[i * 3] * dt; p.array[i * 3 + 1] += vel[i * 3 + 1] * dt; p.array[i * 3 + 2] += vel[i * 3 + 2] * dt; } p.needsUpdate = true; fx.mesh.material.opacity = 1 - k; });
+}
+function fxSphere(x, y, z, color, radius, dur) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, depthWrite: false }));
+  m.position.set(x, y, z); addEffect(m, dur || 0.6, (fx, k) => { fx.mesh.scale.setScalar(0.2 + radius * k); fx.mesh.material.opacity = 0.7 * (1 - k); });
+}
+function fxLightning(tx, ty, tz) {
+  const pts = [], n = 9; for (let i = 0; i <= n; i++) { const k = i / n; pts.push(new THREE.Vector3(tx + (Math.random() - 0.5) * 4 * (1 - k), ty + 45 * (1 - k), tz + (Math.random() - 0.5) * 4 * (1 - k))); }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xe9d5ff, transparent: true }));
+  addEffect(line, 0.35, (fx, k) => { fx.mesh.material.opacity = 1 - k; });
+  fxSphere(tx, ty + 0.8, tz, 0xd8b4fe, 5, 0.4); fxBurst(tx, ty + 1, tz, 0xf5d0fe, 20, 10, 0.4);
+}
+function fxNest(x, y, z) {
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(9, 0.35, 8, 40), new THREE.MeshBasicMaterial({ color: 0x4ade80, transparent: true, opacity: 0.8 }));
+  ring.rotation.x = Math.PI / 2; ring.position.set(x, y + 0.4, z);
+  addEffect(ring, 5, (fx, k, dt, t) => { fx.mesh.position.y = y + 0.4 + Math.sin(t * 4) * 0.3; fx.mesh.material.opacity = 0.8 * (1 - k * k); if (Math.random() < 0.3) fxBurst(x + (Math.random() - 0.5) * 14, y + 0.5, z + (Math.random() - 0.5) * 14, 0x86efac, 3, 4, 0.35); });
+}
+function floater(x, y, z, text, color) {
+  const d = document.createElement('div'); d.className = 'floater'; d.textContent = text; if (color) d.style.color = color; $('labels').appendChild(d);
+  G.floaters = G.floaters || []; G.floaters.push({ el: d, x, y, z, t: 0 });
+}
+
+/* =============================================================================
+   6. NETWORKING
+   ============================================================================= */
+let ws = null, wantReconnect = false, reconnectTimer = null;
+const V = new THREE.Vector3();
+function connect() {
+  if (ws && ws.readyState === WebSocket.OPEN) return;
+  ws = LocalServer.open((s) => { let m; try { m = JSON.parse(s); } catch { return; } handle(m); });
+  if (G.pendingJoin) { send(G.pendingJoin); G.pendingJoin = null; }
+}
+function send(m) { if (ws && ws.readyState === WebSocket.OPEN) ws.receive(JSON.stringify(m)); }
+setInterval(() => { if (ws && ws.readyState === WebSocket.OPEN) send({ type: 'ping', t: performance.now() }); }, 2000);
+setInterval(() => { if (G.phase === 'playing' && G.me && G.me.alive) { const i = G.input; send({ type: 'input', mx: i.mx, mz: i.mz, vy: i.vy, ax: i.ax, az: i.az, fire: i.fire, flySeq: i.flySeq, superSeq: i.superSeq }); } }, 50);
+
+function handle(m) {
+  switch (m.type) {
+    case 'welcome':
+      G.myId = m.id; G.token = m.token; localStorage.setItem('bgu_token', m.token);
+      if (m.balance) { BALANCE = m.balance; buildCards(); }
+      if (m.reconnected) { G.rarity = m.rarity; G.name = m.name; }
+      break;
+    case 'lobby': showLobby(m); break;
+    case 'start': if (G.phase === 'menu') { SFX.init(); G.name = G.name || 'Bird'; } startMatch(m); break;
+    case 'noResume': break;
+    case 'state': onState(m); break;
+    case 'eliminated': onEliminated(m); break;
+    case 'end': onEnd(m); break;
+    case 'pong': G.ping = Math.round(performance.now() - m.t); break;
+  }
+}
+
+/* =============================================================================
+   7. SCREENS & MATCH FLOW
+   ============================================================================= */
+function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('show', s.id === id)); }
+function setControlsVisible(v) { $('hud').classList.toggle('show', v); $('touch').classList.toggle('show', v && isMobile); ['joyMove', 'joyAim'].forEach(j => $(j).style.display = v && isMobile ? 'block' : 'none'); $('btnFly').classList.toggle('show', v); $('btnSuper').classList.toggle('show', v); if (!v) { $('btnUp').classList.remove('show'); $('btnDown').classList.remove('show'); } }
+
+function buildCards() {
+  const cards = $('cards'); cards.innerHTML = '';
+  const max = { hp: 220, speed: 14, damage: 24 };
+  for (const key of RARITY_ORDER) {
+    const r = BALANCE.rarities[key], c = '#' + r.color.toString(16).padStart(6, '0');
+    const d = document.createElement('div'); d.className = 'card' + (key === G.rarity ? ' sel' : ''); d.style.setProperty('--c', c); d.dataset.key = key;
+    d.innerHTML = `<div class="nm">${r.name}</div>
+      <div class="stat"><span>HP</span><div class="bar"><i style="width:${r.hp / max.hp * 100}%"></i></div></div>
+      <div class="stat"><span>SPD</span><div class="bar"><i style="width:${r.speed / max.speed * 100}%"></i></div></div>
+      <div class="stat"><span>DMG</span><div class="bar"><i style="width:${r.damage / max.damage * 100}%"></i></div></div>
+      <div class="ab">★ ${r.abilityName}</div><div class="abd">${r.abilityDesc}</div>`;
+    d.onclick = () => { G.rarity = key; localStorage.setItem('bgu_rarity', key); document.querySelectorAll('.card').forEach(x => x.classList.toggle('sel', x.dataset.key === key)); SFX.init(); SFX.play('pickup'); };
+    cards.appendChild(d);
+  }
+  buildPreviews();
+}
+// six little 3D birds rendered into one wide canvas with scissor viewports
+let pvRenderer, pvScene, pvCam, pvBirds = [];
+function buildPreviews() {
+  if (!pvRenderer) {
+    pvRenderer = new THREE.WebGLRenderer({ canvas: $('previewCanvas'), antialias: true, alpha: true }); pvRenderer.setPixelRatio(1); pvRenderer.setScissorTest(true); pvRenderer.setSize(744, 104, false);
+    pvScene = new THREE.Scene(); pvScene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.2)); const dl = new THREE.DirectionalLight(0xffffff, 1.2); dl.position.set(3, 5, 4); pvScene.add(dl);
+    pvCam = new THREE.PerspectiveCamera(35, 1, 0.1, 50); pvCam.position.set(0, 2.6, 7.2); pvCam.lookAt(0, 0.8, 0);
+  }
+  pvBirds.forEach(b => pvScene.remove(b)); pvBirds = [];
+  MAT.bird = {};
+  for (const key of RARITY_ORDER) { const b = createBirdMesh(key); b.visible = false; pvScene.add(b); pvBirds.push(b); }
+}
+function renderPreviews(t) {
+  if (!pvRenderer || !$('menu').classList.contains('show')) return;
+  const w = 124, h = 104;
+  pvBirds.forEach((b, i) => {
+    pvBirds.forEach(x => x.visible = false); b.visible = true;
+    b.rotation.y = t * 0.8 + i; const f = Math.sin(t * 6 + i) * 0.5; b.userData.wings[0].rotation.z = -f; b.userData.wings[1].rotation.z = f; b.position.y = Math.sin(t * 2 + i) * 0.15;
+    pvRenderer.setViewport(i * w, 0, w, h); pvRenderer.setScissor(i * w, 0, w, h); pvRenderer.render(pvScene, pvCam);
+  });
+}
+
+function joinGame(fresh) {
+  SFX.init();
+  G.name = ($('nameInput').value.trim() || 'Bird' + Math.floor(Math.random() * 99)).slice(0, 14); localStorage.setItem('bgu_name', G.name);
+  const msg = { type: 'join', name: G.name, rarity: G.rarity, token: G.token, fresh: !!fresh };
+  if (ws && ws.readyState === WebSocket.OPEN) send(msg); else { G.pendingJoin = msg; connect(); }
+  if (isMobile) { try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {} try { screen.orientation && screen.orientation.lock('landscape').catch(() => {}); } catch (e) {} }
+}
+function showLobby(m) {
+  G.phase = 'lobby'; showScreen('lobby'); setControlsVisible(false);
+  $('lobbyTitle').textContent = `Waiting for birds… ${m.players.length}/${m.max}`;
+  $('lobbyCount').textContent = m.countdown;
+  $('lobbyList').innerHTML = m.players.map(p => `<div style="color:#${BALANCE.rarities[p.rarity].color.toString(16).padStart(6, '0')}">${esc(p.name)} <small style="opacity:.7">(${BALANCE.rarities[p.rarity].name})</small></div>`).join('');
+}
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function clearMatch() {
+  for (const e of G.ents.values()) { scene.remove(e.mesh); e.label.remove(); }
+  for (const p of G.projectiles.values()) scene.remove(p.mesh);
+  for (const p of G.pickups.values()) scene.remove(p.mesh);
+  for (const c of G.chests.values()) scene.remove(c.mesh);
+  for (const f of G.effects) scene.remove(f.mesh);
+  (G.floaters || []).forEach(f => f.el.remove());
+  G.ents.clear(); G.projectiles.clear(); G.pickups.clear(); G.chests.clear(); G.effects.length = 0; G.floaters = [];
+  $('killfeed').innerHTML = '';
+}
+function startMatch(m) {
+  clearMatch();
+  G.phase = 'playing'; G.eliminated = false; G.spectateId = null; G.storm = m.storm; G.me = null; G.alive = m.birds.length;
+  G.input.flySeq = 0; G.input.superSeq = 0; G.input.fire = false;
+  for (const b of m.birds) {
+    const mesh = createBirdMesh(b.rarity); scene.add(mesh);
+    const label = document.createElement('div'); label.className = 'label';
+    label.innerHTML = `<div style="color:#${BALANCE.rarities[b.rarity].color.toString(16).padStart(6, '0')}">${esc(b.name)}</div><div class="hb"><div class="hf"></div></div>`; $('labels').appendChild(label);
+    const e = { ...b, hp: b.maxHp, mode: 0, flags: 0, alive: true, kills: 0, superCd: 0, mesh, label, hf: label.querySelector('.hf'), buf: [], x: 0, y: 200, z: 0, yaw: 0, px: 0, py: 0, pz: 0, flash: 0 };
+    G.ents.set(b.id, e);
+    if (b.playerId === G.myId) { G.myBirdId = b.id; G.me = { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, mode: 0, dashT: 0, dashX: 0, dashZ: 0, alive: true, synced: false }; e.label.style.display = 'none'; }
+  }
+  for (const p of m.pickups) addPickupMesh(p);
+  for (const c of m.chests) addChestMesh(c);
+  const r = BALANCE.rarities[G.rarity];
+  $('myName').textContent = G.name; $('myName').style.color = '#' + r.color.toString(16).padStart(6, '0');
+  $('superName').textContent = r.abilityName;
+  showScreen(null); setControlsVisible(true); setFlyButton(0);
+  cam.yaw = G.me ? 0 : cam.yaw;
+}
+function setFlyButton(mode) {
+  $('btnFly').textContent = mode ? 'LAND' : 'FLY UP'; $('modeBox').textContent = mode ? '✈ FLYING' : '🐾 GROUND';
+  const showAlt = !!mode && isMobile && G.phase === 'playing';
+  $('btnUp').classList.toggle('show', showAlt); $('btnDown').classList.toggle('show', showAlt); if (!showAlt) altHold = 0;
+}
+function killFeed(html) {
+  const d = document.createElement('div'); d.innerHTML = html; $('killfeed').prepend(d);
+  while ($('killfeed').children.length > 5) $('killfeed').lastChild.remove();
+  setTimeout(() => d.remove(), 6000);
+}
+function nameOf(id) { const e = G.ents.get(id); return e ? `<span style="color:#${BALANCE.rarities[e.rarity].color.toString(16).padStart(6, '0')}">${esc(e.name)}</span>` : '???'; }
+function onEliminated(m) {
+  G.eliminated = true; if (G.me) G.me.alive = false;
+  $('endTitle').textContent = 'ELIMINATED'; $('endTitle').style.filter = 'hue-rotate(300deg)';
+  $('endSub').innerHTML = `You placed <b>#${m.placement}</b> with <b>${m.kills}</b> kills.<br>${m.killer ? 'Knocked out by <b>' + esc(m.killer) + '</b>' : 'Caught by the storm'}`;
+  $('board').innerHTML = ''; $('watchBtn').style.display = ''; showScreen('end'); SFX.play('death');
+  const k = [...G.ents.values()].find(e => e.alive && e.name === m.killer); G.spectateId = k ? k.id : null;
+}
+function onEnd(m) {
+  G.phase = 'ended';
+  const won = m.winner && m.winner.id === G.myBirdId;
+  $('endTitle').textContent = won ? '🏆 VICTORY ROYALE!' : 'MATCH OVER'; $('endTitle').style.filter = '';
+  $('endSub').innerHTML = m.winner ? `${won ? 'You are the last bird alive!' : nameOf(m.winner.id) + ' wins!'} (${m.winner.kills} kills)` : 'Nobody survived the storm.';
+  $('board').innerHTML = m.board.slice(0, 6).map(b => `<div><span>#${b.placement} ${nameOf(b.id)}</span><span>☠ ${b.kills}</span></div>`).join('');
+  $('watchBtn').style.display = 'none'; showScreen('end'); setControlsVisible(false);
+  if (won) SFX.play('win');
+}
+$('playBtn').onclick = () => joinGame(true);
+$('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(true); });
+$('againBtn').onclick = () => { showScreen('menu'); setControlsVisible(false); clearMatch(); G.phase = 'menu'; send({ type: 'leave' }); joinGame(true); };
+$('watchBtn').onclick = () => { showScreen(null); $('hud').classList.add('show'); };
+$('leaveBtn').onclick = () => { send({ type: 'leave' }); G.phase = 'menu'; showScreen('menu'); };
+$('nameInput').value = G.name;
+
+/* =============================================================================
+   8. STATE SNAPSHOTS: interpolation buffer + local prediction reconcile
+   ============================================================================= */
+function onState(m) {
+  if (G.phase !== 'playing' && G.phase !== 'ended') return;
+  const now = performance.now();
+  G.storm = m.storm; G.alive = m.alive;
+  for (const a of m.birds) {
+    const e = G.ents.get(a[0]); if (!e) continue;
+    const [id, x, y, z, yaw, hp, mode, flags, alive, superCd, kills] = a;
+    const wasAlive = e.alive;
+    e.hp = hp; e.flags = flags; e.alive = !!alive; e.superCd = superCd; e.kills = kills;
+    if (id === G.myBirdId && G.me) {
+      const me = G.me;
+      if (!me.synced) { me.x = x; me.y = y; me.z = z; me.yaw = yaw; me.synced = true; }
+      else { const ex = x - me.x, ey = y - me.y, ez = z - me.z, d = Math.hypot(ex, ey, ez); if (d > 6) { me.x = x; me.y = y; me.z = z; } else { me.x += ex * 0.3; me.y += ey * 0.3; me.z += ez * 0.3; } }
+      if (now > G.modeOverrideUntil && me.mode !== mode) { me.mode = mode; setFlyButton(mode); }
+      me.alive = e.alive; me.flags = flags;
+      if (!(flags & 8)) me.dashT = 0;
+    } else {
+      e.mode = mode;
+      e.buf.push({ t: now, x, y, z, yaw }); if (e.buf.length > 12) e.buf.shift();
+    }
+    if (wasAlive && !e.alive) e.mesh.visible = false;
+    if (!wasAlive && e.alive) e.mesh.visible = true;
+  }
+  for (const ev of m.ev) onEvent(ev);
+}
+function onEvent(ev) {
+  const e = G.ents.get(ev.b || ev.t || ev.o || ev.v || -1);
+  switch (ev.type) {
+    case 'shot': {
+      const o = G.ents.get(ev.o); if (!o) break;
+      const col = BALANCE.rarities[o.rarity].color;
+      if (!MAT.proj[o.rarity]) MAT.proj[o.rarity] = new THREE.MeshBasicMaterial({ color: new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.4) });
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 6, 4), MAT.proj[o.rarity]); mesh.scale.set(1, 1, 2.6);
+      mesh.position.set(ev.x, ev.y, ev.z); mesh.lookAt(ev.x + ev.vx, ev.y + ev.vy, ev.z + ev.vz); scene.add(mesh);
+      G.projectiles.set(ev.id, { mesh, x: ev.x, y: ev.y, z: ev.z, vx: ev.vx, vy: ev.vy, vz: ev.vz, ttl: BALANCE.projectile.ttl });
+      if (ev.o === G.myBirdId || distToMe(ev) < 60) SFX.play('shoot');
+      break;
+    }
+    case 'pdead': { const p = G.projectiles.get(ev.id); if (p) { scene.remove(p.mesh); G.projectiles.delete(ev.id); fxBurst(p.x, p.y, p.z, 0xffffff, 4, 4, 0.3); } break; }
+    case 'hit': {
+      const t = G.ents.get(ev.t); if (!t) break;
+      const pos = t.id === G.myBirdId && G.me ? G.me : t;
+      if (ev.blocked) { floater(pos.x, pos.y + 2.4, pos.z, 'BLOCKED', '#93c5fd'); break; }
+      t.flash = 0.2;
+      floater(pos.x, pos.y + 2.4, pos.z, (ev.dive ? '💥 ' : '') + '-' + ev.d, ev.dive ? '#fbbf24' : (t.id === G.myBirdId ? '#f87171' : '#fff'));
+      if (t.id === G.myBirdId) { G.hurtFlash = 1; SFX.play('hurt'); } else if (ev.by === G.myBirdId) SFX.play('hit');
+      break;
+    }
+    case 'kill': {
+      const v = G.ents.get(ev.v); if (!v) break;
+      const pos = v.id === G.myBirdId && G.me ? G.me : v;
+      fxBurst(pos.x, pos.y + 1, pos.z, BALANCE.rarities[v.rarity].color, 40, 12, 0.7); fxSphere(pos.x, pos.y + 1, pos.z, 0xffffff, 4, 0.4);
+      const cause = ev.cause === 'storm' ? `${nameOf(ev.v)} was caught in the storm` : ev.cause === 'lightning' ? `${nameOf(ev.k)} ⚡ ${nameOf(ev.v)}` : ev.cause === 'phoenix' ? `${nameOf(ev.k)} 🔥 ${nameOf(ev.v)}` : ev.cause === 'reflect' ? `${nameOf(ev.v)} hit ${nameOf(ev.k)}'s shadow shield` : `${nameOf(ev.k)} 🪶 ${nameOf(ev.v)}`;
+      killFeed(cause + (ev.rebirth ? ' … <b>but rises again!</b>' : ''));
+      if (ev.v !== G.myBirdId && distToMe(pos) < 80) SFX.play('death');
+      if (ev.k === G.myBirdId && ev.v !== G.myBirdId) $('killText').textContent = '☠ ' + (G.ents.get(G.myBirdId).kills + 1);
+      break;
+    }
+    case 'revive': { if (!e) break; const pos = e.id === G.myBirdId && G.me ? G.me : e; fxSphere(pos.x, pos.y + 1, pos.z, 0xf59e0b, 8, 0.8); fxBurst(pos.x, pos.y + 1, pos.z, 0xfde68a, 40, 14, 0.7); e.mesh.visible = true; if (e.id === G.myBirdId) { G.me.alive = true; G.eliminated = false; showScreen(null); } SFX.play('revive'); break; }
+    case 'pickup': {
+      const p = G.pickups.get(ev.id); if (p) { scene.remove(p.mesh); G.pickups.delete(ev.id); fxBurst(p.x, p.y, p.z, 0xffffff, 10, 5, 0.4); }
+      if (ev.by === G.myBirdId) { SFX.play('pickup'); floater(G.me.x, G.me.y + 2.6, G.me.z, { health: '+HP', speed: 'SPEED!', shield: 'SHIELD!', super: 'SUPER READY!' }[ev.kind], '#a7f3d0'); }
+      break;
+    }
+    case 'spawnPickup': addPickupMesh(ev.pickup); break;
+    case 'chest': { const c = G.chests.get(ev.id); if (c) { c.lid.rotation.x = -1.6; c.lid.position.z = -0.6; fxBurst(c.x, c.y + 1, c.z, 0xffd700, 24, 9, 0.5); } if (ev.by === G.myBirdId) SFX.play('chest'); break; }
+    case 'ability': {
+      if (!e) break;
+      const near = distToMe(ev) < 90;
+      switch (ev.kind) {
+        case 'windDash': fxBurst(ev.x, ev.y + 0.8, ev.z, 0xbae6fd, 20, 10, 0.5); break;
+        case 'healingNest': fxNest(ev.x, ev.y, ev.z); break;
+        case 'stormTalons': fxLightning(ev.tx, ev.ty, ev.tz); if (near) SFX.play('lightning'); break;
+        case 'shadowShield': fxSphere(ev.x, ev.y + 0.8, ev.z, 0x4c1d95, 4, 0.5); break;
+        case 'phoenixRebirth': fxSphere(ev.x, ev.y + 0.8, ev.z, 0xf97316, 16, 0.8); fxSphere(ev.x, ev.y + 0.8, ev.z, 0xfde047, 10, 0.5); fxBurst(ev.x, ev.y + 1, ev.z, 0xfb923c, 60, 18, 0.8); break;
+        case 'featherBurst': fxBurst(ev.x, ev.y + 0.8, ev.z, 0xffffff, 10, 6, 0.4); break;
+      }
+      if (near && ev.kind !== 'stormTalons') SFX.play('super');
+      break;
+    }
+    case 'mode': if (e && e.id !== G.myBirdId) { fxBurst(e.x, e.y + 0.5, e.z, 0xffffff, 6, 4, 0.3); } break;
+    case 'botTakeover': killFeed(`${nameOf(ev.b)} disconnected – a bot took over`); break;
+  }
+}
+function distToMe(p) { return G.me ? Math.hypot(p.x - G.me.x, p.z - G.me.z) : 999; }
+
+/* =============================================================================
+   9. INPUT: touch joysticks, buttons, keyboard, mouse
+   ============================================================================= */
+const joy = { move: { el: $('joyMove'), cx: 0, cy: 0, id: null, x: 0, y: 0 }, aim: { el: $('joyAim'), cx: 0, cy: 0, id: null, x: 0, y: 0 } };
+const JOY_R = 45, JOY_CATCH = 95;
+let camDrag = null;
+function layoutJoysticks() { for (const j of Object.values(joy)) { const r = j.el.getBoundingClientRect(); j.cx = r.left + r.width / 2; j.cy = r.top + r.height / 2; } }
+function setJoy(j, dx, dy) {
+  const l = Math.hypot(dx, dy), s = l > JOY_R ? JOY_R / l : 1; dx *= s; dy *= s;
+  j.x = dx / JOY_R; j.y = dy / JOY_R; j.el.firstElementChild.style.transform = `translate(${dx}px,${dy}px)`;
+}
+const touchEl = $('touch');
+touchEl.addEventListener('pointerdown', (e) => {
+  SFX.init(); layoutJoysticks();
+  for (const j of Object.values(joy)) if (j.id === null && Math.hypot(e.clientX - j.cx, e.clientY - j.cy) < JOY_CATCH) { j.id = e.pointerId; setJoy(j, e.clientX - j.cx, e.clientY - j.cy); touchEl.setPointerCapture(e.pointerId); return; }
+  camDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+});
+touchEl.addEventListener('pointermove', (e) => {
+  for (const j of Object.values(joy)) if (j.id === e.pointerId) { setJoy(j, e.clientX - j.cx, e.clientY - j.cy); return; }
+  if (camDrag && camDrag.id === e.pointerId) { cam.yaw -= (e.clientX - camDrag.x) * 0.006; cam.pitch = clamp(cam.pitch + (e.clientY - camDrag.y) * 0.004, -0.15, 1.2); camDrag.x = e.clientX; camDrag.y = e.clientY; }
+});
+const endPointer = (e) => { for (const j of Object.values(joy)) if (j.id === e.pointerId) { j.id = null; setJoy(j, 0, 0); } if (camDrag && camDrag.id === e.pointerId) camDrag = null; };
+touchEl.addEventListener('pointerup', endPointer); touchEl.addEventListener('pointercancel', endPointer);
+
+function toggleFly() {
+  if (!G.me || !G.me.alive) return;
+  G.input.flySeq++; G.me.mode = G.me.mode ? 0 : 1; G.modeOverrideUntil = performance.now() + 400;
+  if (G.me.mode === 1) { G.me.y = Math.max(G.me.y, groundY(G.me.x, G.me.z) + 1.5); G.me.vy = 6; SFX.play('fly'); } else SFX.play('land');
+  setFlyButton(G.me.mode);
+}
+function useSuper() { if (!G.me || !G.me.alive) return; const e = G.ents.get(G.myBirdId); if (e && e.superCd <= 0) G.input.superSeq++; }
+let altHold = 0;   // -1 / 0 / +1 from the touch altitude buttons
+for (const [id, v] of [['btnUp', 1], ['btnDown', -1]]) {
+  const b = $(id);
+  b.addEventListener('pointerdown', (e) => { e.preventDefault(); altHold = v; b.setPointerCapture(e.pointerId); });
+  const off = () => { if (altHold === v) altHold = 0; };
+  b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
+}
+$('btnFly').addEventListener('pointerdown', (e) => { e.preventDefault(); SFX.init(); toggleFly(); });
+$('btnSuper').addEventListener('pointerdown', (e) => { e.preventDefault(); SFX.init(); useSuper(); });
+
+// keyboard + mouse (desktop testing)
+const keys = {}; let mouse = { x: 0, y: 0, down: false, drag: null };
+window.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT') return; keys[e.code] = true; SFX.init();
+  if (e.code === 'Space') { e.preventDefault(); toggleFly(); }
+  if (e.code === 'KeyF') useSuper();
+});
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+canvas.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') return; SFX.init(); if (e.button === 0) mouse.down = true; if (e.button === 2 || e.button === 1) mouse.drag = { x: e.clientX, y: e.clientY }; });
+window.addEventListener('pointermove', (e) => { if (e.pointerType !== 'mouse') return; mouse.x = e.clientX; mouse.y = e.clientY; if (mouse.drag) { cam.yaw -= (e.clientX - mouse.drag.x) * 0.005; cam.pitch = clamp(cam.pitch + (e.clientY - mouse.drag.y) * 0.004, -0.15, 1.2); mouse.drag = { x: e.clientX, y: e.clientY }; } });
+window.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') return; if (e.button === 0) mouse.down = false; mouse.drag = null; });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Builds this frame's input from joysticks / keys, relative to the camera.
+function gatherInput(dt) {
+  const i = G.input, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), rx = -Math.cos(cam.yaw), rz = Math.sin(cam.yaw);
+  let jx = joy.move.x, jy = joy.move.y;
+  if (keys.KeyW) jy -= 1; if (keys.KeyS) jy += 1; if (keys.KeyA) jx -= 1; if (keys.KeyD) jx += 1;
+  const l = Math.hypot(jx, jy); if (l > 1) { jx /= l; jy /= l; }
+  i.mx = fx * -jy + rx * jx; i.mz = fz * -jy + rz * jx;
+  i.vy = (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0) + altHold;   // keyboard Q/E or the touch ▲/▼ buttons
+  if (keys.ArrowLeft) cam.yaw += 2 * dt; if (keys.ArrowRight) cam.yaw -= 2 * dt;
+  if (keys.ArrowUp) cam.pitch = clamp(cam.pitch - dt, -0.15, 1.2); if (keys.ArrowDown) cam.pitch = clamp(cam.pitch + dt, -0.15, 1.2);
+  // aim: right stick, or mouse position projected to the bird's height
+  const ax0 = joy.aim.x, ay0 = joy.aim.y, al = Math.hypot(ax0, ay0);
+  if (joy.aim.id !== null && al > 0.25) {
+    const nx = ax0 / al, ny = ay0 / al; i.ax = fx * -ny + rx * nx; i.az = fz * -ny + rz * nx; i.fire = true;
+  } else if (!isMobile && G.me) {
+    const ndc = new THREE.Vector2((mouse.x / window.innerWidth) * 2 - 1, -(mouse.y / window.innerHeight) * 2 + 1);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, camera);
+    const o = ray.ray.origin, d = ray.ray.direction, t = (G.me.y - o.y) / (d.y || -0.0001);
+    if (t > 0) { const px = o.x + d.x * t, pz = o.z + d.z * t, l2 = Math.hypot(px - G.me.x, pz - G.me.z) || 1; i.ax = (px - G.me.x) / l2; i.az = (pz - G.me.z) / l2; }
+    i.fire = mouse.down;
+  } else i.fire = false;
+}
+
+/* =============================================================================
+   10. GAME LOOP: prediction, interpolation, camera, effects, HUD
+   ============================================================================= */
+const miniBase = document.createElement('canvas'); miniBase.width = miniBase.height = 116;
+function buildMinimapBase() {
+  const ctx = miniBase.getContext('2d'), n = 116, s = MAP.radius * 2 / n;
+  ctx.fillStyle = '#1c4f8a'; ctx.fillRect(0, 0, n, n);
+  for (let py = 0; py < n; py += 2) for (let px = 0; px < n; px += 2) {
+    const h = terrainHeight((px - n / 2) * s, (py - n / 2) * s);
+    if (h < MAP.waterLevel) continue;
+    ctx.fillStyle = h < 1.2 ? '#d2b976' : h > 38 ? '#8a8680' : h > 30 ? '#7d9a58' : '#4c9a3f'; ctx.fillRect(px, py, 2, 2);
+  }
+  ctx.fillStyle = '#e5e7eb'; for (const l of Object.values(MAP.landmarks)) ctx.fillRect(n / 2 + l.x / s - 2, n / 2 + l.z / s - 2, 4, 4);
+}
+function drawMinimap() {
+  const c = $('minimap').getContext('2d'), n = 116, s = n / (MAP.radius * 2), S = G.storm;
+  c.drawImage(miniBase, 0, 0);
+  if (S) {
+    c.fillStyle = 'rgba(124,58,237,.45)'; c.beginPath(); c.rect(0, 0, n, n); c.arc(n / 2 + S.cx * s, n / 2 + S.cz * s, Math.max(0.1, S.r * s), 0, 6.283, true); c.fill('evenodd');
+    c.strokeStyle = '#fff'; c.lineWidth = 1; c.beginPath(); c.arc(n / 2 + S.nextCx * s, n / 2 + S.nextCz * s, Math.max(0.1, S.nextR * s), 0, 6.283); c.stroke();
+  }
+  c.fillStyle = '#ffd700'; for (const ch of G.chests.values()) if (!ch.opened) c.fillRect(n / 2 + ch.x * s - 1.5, n / 2 + ch.z * s - 1.5, 3, 3);
+  for (const e of G.ents.values()) { if (!e.alive || e.id === G.myBirdId) continue; c.fillStyle = e.mode ? '#fb923c' : '#ef4444'; c.beginPath(); c.arc(n / 2 + e.x * s, n / 2 + e.z * s, 2.2, 0, 6.283); c.fill(); }
+  if (G.me) { c.save(); c.translate(n / 2 + G.me.x * s, n / 2 + G.me.z * s); c.rotate(G.me.yaw); c.fillStyle = '#fff'; c.beginPath(); c.moveTo(0, -5); c.lineTo(3.5, 3); c.lineTo(-3.5, 3); c.closePath(); c.fill(); c.restore(); }
+}
+function toScreen(x, y, z) { V.set(x, y, z).project(camera); return V.z > 1 ? null : { x: (V.x + 1) / 2 * window.innerWidth, y: (1 - V.y) / 2 * window.innerHeight }; }
+
+let last = performance.now(), fps = 60, uiTimer = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; const t = now / 1000;
+  renderPreviews(t);
+  if (G.phase !== 'playing' && G.phase !== 'ended') { return; }
+
+  // ---- local prediction
+  const me = G.me, myEnt = G.ents.get(G.myBirdId);
+  if (me && me.alive && me.synced) {
+    gatherInput(dt);
+    const st = BALANCE.rarities[G.rarity], boost = (me.flags & 4) ? BALANCE.pickups.speedMul : 1, slow = (me.flags & 16) ? 0.4 : 1;
+    if ((me.flags & 8) && me.dashT <= 0) { me.dashT = 0.35; me.dashX = G.input.ax; me.dashZ = G.input.az; }
+    moveBird(me, G.input, dt, { speed: st.speed * boost * slow, flySpeed: st.flySpeed * boost * slow, climbSpeed: BALANCE.match.climbSpeed, fallSpeed: BALANCE.match.fallSpeed, maxAlt: BALANCE.match.maxAltitude, dashSpeed: BALANCE.abilities.windDash.speed });
+    myEnt.x = me.x; myEnt.y = me.y; myEnt.z = me.z; myEnt.yaw = me.yaw; myEnt.mode = me.mode; myEnt.pvy = me.vy;
+  }
+
+  // ---- interpolate remote birds (render ~100ms in the past)
+  const rt = now - 100;
+  for (const e of G.ents.values()) {
+    if (e.id === G.myBirdId && me && me.alive) continue;
+    const b = e.buf; if (!b.length) continue;
+    let s0 = b[0], s1 = b[b.length - 1];
+    for (let i = 0; i < b.length - 1; i++) if (b[i].t <= rt && b[i + 1].t >= rt) { s0 = b[i]; s1 = b[i + 1]; break; }
+    const k = s1.t > s0.t ? clamp((rt - s0.t) / (s1.t - s0.t), 0, 1) : 1;
+    const nx = lerp(s0.x, s1.x, k), ny = lerp(s0.y, s1.y, k), nz = lerp(s0.z, s1.z, k);
+    e.pvy = dt > 0 ? (ny - e.y) / dt : 0; e.x = nx; e.y = ny; e.z = nz; e.yaw = lerpAngle(e.yaw, lerpAngle(s0.yaw, s1.yaw, k), 0.6);
+  }
+
+  // ---- bird visuals: position, flapping, tilt, flags, labels
+  for (const e of G.ents.values()) {
+    const u = e.mesh.userData, isMe = e.id === G.myBirdId;
+    e.mesh.visible = e.alive;
+    if (!e.alive) { e.label.style.display = 'none'; continue; }
+    e.mesh.position.set(e.x, e.y, e.z); e.mesh.rotation.y = e.yaw;
+    const moving = isMe && me ? Math.hypot(me.vx, me.vz) > 0.5 : (e.buf.length > 1 && Math.hypot(e.buf[e.buf.length - 1].x - e.buf[e.buf.length - 2].x, e.buf[e.buf.length - 1].z - e.buf[e.buf.length - 2].z) > 0.05);
+    u.flap += dt * (e.mode ? 11 : moving ? 6 : 1.5);
+    const f = e.mode ? Math.sin(u.flap) * 0.7 : moving ? Math.sin(u.flap) * 0.15 : -0.35 + Math.sin(u.flap) * 0.03;
+    u.wings[0].rotation.z = -f; u.wings[1].rotation.z = f;
+    const vy = e.pvy || 0;
+    e.mesh.rotation.x = e.mode ? clamp(-vy / 14, -0.6, 0.6) : (e.y > groundY(e.x, e.z) + 0.3 ? 0.3 : 0);
+    u.shield.visible = !!(e.flags & 1); u.shadow.visible = !!(e.flags & 2);
+    if (e.flash > 0) { e.flash -= dt; u.body.material.emissiveIntensity = 1.2; } else u.body.material.emissiveIntensity = 0.12;
+    if (e.flags & 4 && Math.random() < 0.3) fxBurst(e.x, e.y + 0.5, e.z, 0xfde68a, 2, 2, 0.3);
+    u.aimArrow.visible = isMe && G.input.fire;
+    if (isMe) { u.aimPivot.rotation.y = Math.atan2(G.input.ax, G.input.az) - e.yaw; }
+    if (!isMe) {
+      const p = toScreen(e.x, e.y + 2.6, e.z), far = distToMe(e) > 140;
+      if (p && !far) { e.label.style.display = 'block'; e.label.style.left = p.x + 'px'; e.label.style.top = p.y + 'px'; e.hf.style.width = (e.hp / e.maxHp * 100) + '%'; e.hf.style.background = e.hp / e.maxHp > 0.5 ? '#2dd36f' : e.hp / e.maxHp > 0.25 ? '#fbbf24' : '#ef4444'; }
+      else e.label.style.display = 'none';
+    }
+  }
+
+  // ---- projectiles (client-simulated from the 'shot' event)
+  for (const [id, p] of G.projectiles) {
+    p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.ttl -= dt; p.mesh.position.set(p.x, p.y, p.z);
+    if (p.ttl <= 0 || p.y < groundY(p.x, p.z)) { scene.remove(p.mesh); G.projectiles.delete(id); }
+  }
+  // ---- pickups bob, chests, effects, floaters
+  for (const p of G.pickups.values()) { p.mesh.rotation.y += dt * 2; p.mesh.position.y = p.y + Math.sin(t * 3 + p.id) * 0.3; }
+  for (let i = G.effects.length - 1; i >= 0; i--) { const fx = G.effects[i]; fx.t += dt; const k = fx.t / fx.dur; if (k >= 1) { scene.remove(fx.mesh); G.effects.splice(i, 1); } else fx.update(fx, k, dt, fx.t); }
+  for (let i = (G.floaters || []).length - 1; i >= 0; i--) { const f = G.floaters[i]; f.t += dt; const p = toScreen(f.x, f.y + f.t * 2, f.z); if (f.t > 1 || !p) { f.el.remove(); G.floaters.splice(i, 1); } else { f.el.style.left = p.x + 'px'; f.el.style.top = p.y + 'px'; f.el.style.opacity = 1 - f.t; } }
+  if (G.clouds) for (const c of G.clouds) { c.position.x += dt * 1.5; if (c.position.x > 320) c.position.x = -320; }
+  if (G.water) G.water.position.y = MAP.waterLevel + Math.sin(t * 0.8) * 0.12 - 0.1;
+
+  // ---- storm visuals + damage feedback
+  if (G.storm) {
+    const S = G.storm;
+    stormDome.position.x = S.cx; stormDome.position.z = S.cz; stormDome.scale.set(Math.max(0.5, S.r), 1, Math.max(0.5, S.r));
+    stormRing.position.x = S.nextCx; stormRing.position.z = S.nextCz; stormRing.scale.set(Math.max(0.5, S.nextR), 1, Math.max(0.5, S.nextR));
+    stormRing.visible = S.state === 'wait';
+    stormDome.material.opacity = 0.25 + Math.sin(t * 2) * 0.05;
+    const outside = me && me.alive && Math.hypot(me.x - S.cx, me.z - S.cz) > S.r;
+    $('stormVig').style.opacity = outside ? 1 : 0;
+    if (outside && t - G.lastStormTick > 1) { G.lastStormTick = t; SFX.play('storm'); }
+  }
+  if (G.hurtFlash > 0) { G.hurtFlash -= dt * 3; $('vignette').style.opacity = clamp(G.hurtFlash, 0, 1); }
+
+  // ---- camera: third person following me (or spectate target)
+  let target = me && me.alive ? me : (G.spectateId && G.ents.get(G.spectateId) && G.ents.get(G.spectateId).alive ? G.ents.get(G.spectateId) : [...G.ents.values()].find(e => e.alive) || myEnt);
+  if (target) {
+    const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch);
+    const tx = target.x, ty = target.y + 1.2, tz = target.z;
+    let cx = tx - fx * cam.dist * cp, cy = ty + cam.dist * sp, cz = tz - fz * cam.dist * cp;
+    const g = groundY(cx, cz) + 1.2; if (cy < g) cy = g;
+    const k = 1 - Math.exp(-14 * dt);
+    camera.position.x = lerp(camera.position.x, cx, k); camera.position.y = lerp(camera.position.y, cy, k); camera.position.z = lerp(camera.position.z, cz, k);
+    if (G.hurtFlash > 0) camera.position.y += (Math.random() - 0.5) * 0.3;
+    camera.lookAt(tx, ty, tz);
+    sun.position.set(tx + 60, ty + 110, tz + 40); sun.target.position.set(tx, ty, tz);
+  }
+
+  // ---- HUD (cheap parts every frame, the rest ~10x/sec)
+  uiTimer += dt;
+  if (uiTimer > 0.1) {
+    uiTimer = 0;
+    if (myEnt) { $('hpFill').style.width = clamp(myEnt.hp / myEnt.maxHp * 100, 0, 100) + '%'; $('hpText').textContent = Math.max(0, Math.round(myEnt.hp)) + ' / ' + myEnt.maxHp; $('killText').textContent = '☠ ' + myEnt.kills; }
+    $('aliveText').textContent = `🐦 ${G.alive} alive`; $('ping').textContent = `${G.ping} ms · ${Math.round(fps)} fps`;
+    if (G.storm) { const S = G.storm; $('stormText').textContent = S.state === 'wait' ? `Storm shrinks in ${Math.ceil(S.timer)}s` : S.state === 'shrink' ? `⚠ STORM SHRINKING ${Math.ceil(S.timer)}s` : '⚠ FINAL ZONE'; }
+    if (myEnt) {
+      const st = BALANCE.rarities[G.rarity], cd = myEnt.superCd, ready = cd <= 0;
+      $('btnSuper').classList.toggle('cd', !ready); $('cdRing').style.strokeDashoffset = (295.3 * (ready ? 0 : cd / st.superCooldown)).toFixed(1);
+      $('cdText').textContent = ready ? 'SUPER' : Math.ceil(cd);
+    }
+    drawMinimap();
+  }
+  fps = fps * 0.95 + (1 / Math.max(dt, 0.001)) * 0.05;
+  renderer.render(scene, camera);
+}
+
+/* =============================================================================
+   BOOT
+   ============================================================================= */
+buildTerrain(); buildScatter(); buildLandmarks(); buildStorm(); buildMinimapBase(); buildCards();
+resize(); camera.position.set(0, 60, -120); camera.lookAt(0, 20, 0);
+connect();
+requestAnimationFrame(frame);
+</script>

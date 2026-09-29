@@ -2,7 +2,14 @@
 
 A 3D mobile battle royale for 10 birds. Three.js client in a single `index.html`, authoritative Node.js + `ws` server in `server.js`.
 
-## Run it
+## Two ways to play
+
+- **Solo (no server):** open `solo.html` in any browser, or via the published artifact link. You play against 9 bots; the match simulation runs inside the page. Nothing to install. Good for practice and for iPads/phones with no computer around.
+- **Online multiplayer (the app version):** `server.js` + `index.html`, below. Real players from any device join the same lobby.
+
+`solo.html` is generated from the other two files and carries the same game code; it does not affect the app version.
+
+## Run the app version
 
 ```bash
 npm install
