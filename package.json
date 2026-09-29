@@ -1,0 +1,13 @@
+{
+  "name": "bird-game-ultimate",
+  "version": "1.0.0",
+  "description": "Bird Game Ultimate - a mobile 3D multiplayer battle royale (Three.js client, authoritative Node.js/ws server)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.17.0"
+  },
+  "license": "MIT"
+}
