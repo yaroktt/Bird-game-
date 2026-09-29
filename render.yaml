@@ -1,0 +1,9 @@
+# One-click deploy on Render (https://render.com): New + > Blueprint > pick this repo.
+services:
+  - type: web
+    name: bird-game-ultimate
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /
