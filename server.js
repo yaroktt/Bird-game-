@@ -30,18 +30,42 @@ const BALANCE = {
   // Per-rarity stats. hp = max health, speed = ground speed, flySpeed = air speed,
   // damage = per feather shot, fireRate = shots per second, superCooldown = seconds.
   rarities: {
-    common:    { name: 'Common',     color: 0x9aa0a6, hp: 100, speed: 11.0, flySpeed: 18, damage: 12, fireRate: 5.0, superCooldown: 12,
-                 ability: 'featherBurst',   abilityName: 'Feather Burst',   abilityDesc: 'Fires a wide spread of 7 feathers.' },
-    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 120, speed: 12.0, flySpeed: 20, damage: 14, fireRate: 5.5, superCooldown: 11,
-                 ability: 'windDash',       abilityName: 'Wind Dash',       abilityDesc: 'Blast forward at high speed, hurting anyone you pass.' },
-    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, fireRate: 6.0, superCooldown: 14,
-                 ability: 'healingNest',    abilityName: 'Healing Nest',    abilityDesc: 'Drops a nest that heals every bird inside it for 5s.' },
-    epic:      { name: 'Epic',       color: 0xa855f7, hp: 165, speed: 13.0, flySpeed: 22, damage: 18, fireRate: 6.0, superCooldown: 13,
-                 ability: 'stormTalons',    abilityName: 'Storm Talons',    abilityDesc: 'Calls lightning down on the nearest enemy, damaging and slowing it.' },
-    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, fireRate: 6.5, superCooldown: 15,
-                 ability: 'shadowShield',   abilityName: 'Shadow Shield',   abilityDesc: 'Become invulnerable for 4s and reflect all damage back.' },
-    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 220, speed: 14.0, flySpeed: 24, damage: 24, fireRate: 7.0, superCooldown: 18,
-                 ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth', abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
+    common:    { name: 'Common',     color: 0x9aa0a6, hp: 100, speed: 11.0, flySpeed: 18, damage: 12, fireRate: 5.0, superCooldown: 12 },
+    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 120, speed: 12.0, flySpeed: 20, damage: 14, fireRate: 5.5, superCooldown: 11 },
+    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, fireRate: 6.0, superCooldown: 14 },
+    epic:      { name: 'Epic',       color: 0xa855f7, hp: 165, speed: 13.0, flySpeed: 22, damage: 18, fireRate: 6.0, superCooldown: 13 },
+    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, fireRate: 6.5, superCooldown: 15 },
+    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 220, speed: 14.0, flySpeed: 24, damage: 24, fireRate: 7.0, superCooldown: 18 },
+  },
+  // The 26 birds. Stats come from the rarity above; each bird has its own body color and super ability.
+  // `ability` keys map to cases in Room.useAbility(); tune their numbers in `abilities` below.
+  birds: {
+    sparrow:    { n: 1,  name: 'Sparrow',          ru: 'Воробей',            rarity: 'common',    body: 0x8b6b4a, ability: 'quickPeck',      abilityName: 'Quick Peck',       abilityDesc: 'Double fire rate for 4s.' },
+    pigeon:     { n: 2,  name: 'Pigeon',           ru: 'Голубь',             rarity: 'common',    body: 0x8d93a8, ability: 'invisibility',   abilityName: 'Invisibility',     abilityDesc: 'Vanish for 7s. Enemies and bots cannot see or target you.' },
+    robin:      { n: 3,  name: 'Robin',            ru: 'Малиновка',          rarity: 'common',    body: 0xc9613b, ability: 'featherBurst',   abilityName: 'Feather Burst',    abilityDesc: 'Fires a wide spread of 7 feathers.' },
+    starling:   { n: 4,  name: 'Starling',         ru: 'Скворец',            rarity: 'common',    body: 0x2f3b4a, ability: 'flockCall',      abilityName: 'Flock Call',       abilityDesc: 'Sends 4 homing feathers after the nearest enemy.' },
+    wren:       { n: 5,  name: 'Wren',             ru: 'Крапивник',          rarity: 'common',    body: 0x9c7a55, ability: 'tinyTarget',     abilityName: 'Tiny Target',      abilityDesc: 'Shrink for 6s: half as easy to hit and 25% faster.' },
+    finch:      { n: 6,  name: 'Finch',            ru: 'Зяблик',             rarity: 'common',    body: 0xd98c5f, ability: 'seedSnack',      abilityName: 'Seed Snack',       abilityDesc: 'Instantly heal 40 HP.' },
+    blueJay:    { n: 7,  name: 'Blue Jay',         ru: 'Голубая сойка',      rarity: 'rare',      body: 0x3b82f6, ability: 'screech',        abilityName: 'Mimic Screech',    abilityDesc: 'Every enemy within 16 is slowed for 2s.' },
+    cardinal:   { n: 8,  name: 'Cardinal',         ru: 'Кардинал',           rarity: 'rare',      body: 0xd7263d, ability: 'crimsonRage',    abilityName: 'Crimson Rage',     abilityDesc: '+60% damage for 5s.' },
+    kingfisher: { n: 9,  name: 'Kingfisher',       ru: 'Зимородок',          rarity: 'rare',      body: 0x1f9dd9, ability: 'windDash',       abilityName: 'Dive Strike',      abilityDesc: 'Blast forward at high speed, hurting anyone you pass.' },
+    magpie:     { n: 10, name: 'Magpie',           ru: 'Сорока',             rarity: 'rare',      body: 0x1e1e2a, ability: 'stealShine',     abilityName: 'Steal Shine',      abilityDesc: 'Take 30 HP from the nearest enemy within 22 and keep it.' },
+    woodpecker: { n: 11, name: 'Woodpecker',       ru: 'Дятел',              rarity: 'rare',      body: 0xb03030, ability: 'drillShot',      abilityName: 'Drill Shot',       abilityDesc: 'One heavy feather (45 dmg) that pierces through every bird in its path.' },
+    barnOwl:    { n: 12, name: 'Barn Owl',         ru: 'Сипуха',             rarity: 'superRare', body: 0xe8d8b8, ability: 'hush',           abilityName: 'Hush',             abilityDesc: 'Enemies within 22 are slowed 2s and their super is delayed by 6s.' },
+    raven:      { n: 13, name: 'Raven',            ru: 'Ворон',              rarity: 'superRare', body: 0x15151d, ability: 'shadowShield',   abilityName: 'Shadow Shield',    abilityDesc: 'Become invulnerable for 4s and reflect all damage back.' },
+    toucan:     { n: 14, name: 'Toucan',           ru: 'Тукан',              rarity: 'superRare', body: 0x1a1a1a, ability: 'fruitBomb',      abilityName: 'Fruit Bomb',       abilityDesc: 'Lob a fruit that explodes for 55 damage in a radius of 8.' },
+    flamingo:   { n: 15, name: 'Flamingo',         ru: 'Фламинго',           rarity: 'superRare', body: 0xf07aa8, ability: 'healingNest',    abilityName: 'Healing Nest',     abilityDesc: 'Drops a nest that heals every bird inside it for 5s.' },
+    macaw:      { n: 16, name: 'Macaw',            ru: 'Ара',                rarity: 'superRare', body: 0xe63946, ability: 'rainbowRing',    abilityName: 'Rainbow Ring',     abilityDesc: 'Fires 12 feathers in every direction at once.' },
+    peregrine:  { n: 17, name: 'Peregrine Falcon', ru: 'Сапсан',             rarity: 'epic',      body: 0x4a5a6b, ability: 'stoop',          abilityName: 'Stoop',            abilityDesc: 'The fastest dive in nature: rocket forward and down, 60 damage on contact.' },
+    snowyOwl:   { n: 18, name: 'Snowy Owl',        ru: 'Белая сова',         rarity: 'epic',      body: 0xf2f2f2, ability: 'frostTalons',    abilityName: 'Frost Talons',     abilityDesc: 'Freeze the nearest enemy within 40: 40 damage and a 3s slow.' },
+    hornbill:   { n: 19, name: 'Hornbill',         ru: 'Птица-носорог',      rarity: 'epic',      body: 0x222222, ability: 'casqueBash',     abilityName: 'Casque Bash',      abilityDesc: 'Charge forward; each bird you hit takes 40 and heals you 20.' },
+    osprey:     { n: 20, name: 'Osprey',           ru: 'Скопа',              rarity: 'epic',      body: 0x6b5a48, ability: 'fishHook',       abilityName: 'Fish Hook',        abilityDesc: 'Yank the nearest enemy within 35 to your side and deal 35.' },
+    goldenEagle:{ n: 21, name: 'Golden Eagle',     ru: 'Беркут',             rarity: 'epic',      body: 0x8a5a23, ability: 'stormTalons',    abilityName: 'Storm Talons',     abilityDesc: 'Calls lightning down on the nearest enemy, damaging and slowing it.' },
+    baldEagle:  { n: 22, name: 'Bald Eagle',       ru: 'Белоголовый орлан',  rarity: 'mythic',    body: 0x4a3826, ability: 'freedomStrike',  abilityName: 'Freedom Strike',   abilityDesc: 'Lightning hits every enemy within 30 for 45.' },
+    condor:     { n: 23, name: 'Andean Condor',    ru: 'Андский кондор',     rarity: 'mythic',    body: 0x2a2a2a, ability: 'thermalRise',    abilityName: 'Thermal Rise',     abilityDesc: 'Untouchable for 2s, then regenerate 70 HP over 5s with a speed boost.' },
+    harpy:      { n: 24, name: 'Harpy Eagle',      ru: 'Гарпия',             rarity: 'mythic',    body: 0x6a7a8a, ability: 'crushingGrip',   abilityName: 'Crushing Grip',    abilityDesc: 'Seize the nearest enemy within 25: 95 damage and a 2.5s slow.' },
+    phoenix:    { n: 25, name: 'Phoenix',          ru: 'Феникс',             rarity: 'legendary', body: 0xff7a1a, ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth',  abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
+    thunderbird:{ n: 26, name: 'Thunderbird',      ru: 'Птица грома',        rarity: 'legendary', body: 0x3a3a9a, ability: 'thunderstorm',   abilityName: 'Thunderstorm',     abilityDesc: '6 lightning bolts over 3s on random enemies within 45, 40 damage each.' },
   },
   projectile: {
     speed: 70, ttl: 1.1,
@@ -51,12 +75,32 @@ const BALANCE = {
     diveHeight: 6,          // shooter must be this much higher than the target
   },
   abilities: {
+    quickPeck:      { duration: 4, rateMul: 2 },
+    invisibility:   { duration: 7 },
     featherBurst:   { count: 7, spreadDeg: 70, dmgMul: 0.9 },
+    flockCall:      { count: 4, dmgMul: 0.8, turnRate: 6 },
+    tinyTarget:     { duration: 6, speedMul: 1.25, radiusMul: 0.5 },
+    seedSnack:      { heal: 40 },
+    screech:        { radius: 16, slow: 2 },
+    crimsonRage:    { duration: 5, dmgMul: 1.6 },
     windDash:       { speed: 110, duration: 0.35, contactDamage: 22 },
-    healingNest:    { radius: 9, duration: 5, healPerSec: 16 },
-    stormTalons:    { range: 45, damage: 65, slowDuration: 1.2 },
+    stealShine:     { range: 22, amount: 30 },
+    drillShot:      { damage: 45 },
+    hush:           { radius: 22, slow: 2, silence: 6 },
     shadowShield:   { duration: 4, reflect: 1.0 },
+    fruitBomb:      { damage: 55, radius: 8, speed: 32, lob: 18 },
+    healingNest:    { radius: 9, duration: 5, healPerSec: 16 },
+    rainbowRing:    { count: 12, dmgMul: 0.8 },
+    stoop:          { speed: 120, duration: 0.5, contactDamage: 60, dive: 55 },
+    frostTalons:    { range: 40, damage: 40, slow: 3 },
+    casqueBash:     { speed: 90, duration: 0.45, contactDamage: 40, heal: 20 },
+    fishHook:       { range: 35, damage: 35 },
+    stormTalons:    { range: 45, damage: 65, slowDuration: 1.2 },
+    freedomStrike:  { radius: 30, damage: 45, slow: 1 },
+    thermalRise:    { invuln: 2, regen: 70, regenTime: 5, speedTime: 6 },
+    crushingGrip:   { range: 25, damage: 95, slow: 2.5 },
     phoenixRebirth: { radius: 15, damage: 85, reviveHp: 0.5, reviveDelay: 1.5 },
+    thunderstorm:   { radius: 45, bolts: 6, duration: 3, damage: 40, slow: 0.8 },
   },
   pickups: {
     count: 44, chests: 8,
@@ -84,6 +128,8 @@ const BALANCE = {
   },
 };
 const RARITY_KEYS = Object.keys(BALANCE.rarities);
+const BIRD_KEYS = Object.keys(BALANCE.birds);
+const SUPPORT_ABILITIES = new Set(['seedSnack', 'healingNest', 'thermalRise', 'invisibility', 'tinyTarget', 'shadowShield']);
 const BOT_NAMES = ['Pecky', 'Skyler', 'Talon', 'Nimbus', 'Robin', 'Zephyr', 'Kiwi', 'Falcon', 'Pip', 'Wren', 'Storm', 'Ash', 'Cinder', 'Gale', 'Echo', 'Blue'];
 
 /* =============================================================================
@@ -127,8 +173,9 @@ function moveBird(b, inp, dt, P) {
   let mx = inp.mx || 0, mz = inp.mz || 0;
   const len = Math.hypot(mx, mz);
   if (len > 1) { mx /= len; mz /= len; }
-  if (b.dashT > 0) {                       // Wind Dash overrides movement
+  if (b.dashT > 0) {                       // dashes (Wind Dash, Stoop, Casque Bash) override movement
     b.x += b.dashX * P.dashSpeed * dt; b.z += b.dashZ * P.dashSpeed * dt;
+    if (b.dashY) { b.y = Math.max(groundY(b.x, b.z) + 1.5, b.y + b.dashY * dt); b.vy = 0; }
     b.dashT -= dt;
   }
   if (b.mode === 1) {                      // FLYING: smooth glide toward target velocity
@@ -196,8 +243,9 @@ class Room {
   }
 
   /* ---------- lobby ---------- */
-  addPlayer(client, name, rarity, token) {
-    const p = { id: client.id, name, rarity, token, ws: client.ws };
+  addPlayer(client, name, birdKey, token) {
+    const rarity = BALANCE.birds[birdKey].rarity;
+    const p = { id: client.id, name, rarity, bird: birdKey, token, ws: client.ws };
     this.players.set(p.id, p);
     client.room = this;
     this.broadcastLobby();
@@ -211,7 +259,7 @@ class Room {
     }
   }
   broadcastLobby() {
-    const list = [...this.players.values()].map(p => ({ id: p.id, name: p.name, rarity: p.rarity }));
+    const list = [...this.players.values()].map(p => ({ id: p.id, name: p.name, rarity: p.rarity, bird: p.bird }));
     this.broadcast({ type: 'lobby', players: list, countdown: Math.ceil(this.countdown), max: BALANCE.match.maxPlayers });
   }
   broadcast(msg) {
@@ -222,9 +270,9 @@ class Room {
 
   /* ---------- match start ---------- */
   makeBird(opts) {
-    const st = BALANCE.rarities[opts.rarity];
+    const bird = BALANCE.birds[opts.bird], st = BALANCE.rarities[bird.rarity];
     return {
-      id: uid(), name: opts.name, rarity: opts.rarity, isBot: !!opts.isBot, playerId: opts.playerId || null, token: opts.token || null,
+      id: uid(), name: opts.name, bird: opts.bird, rarity: bird.rarity, ability: bird.ability, isBot: !!opts.isBot, playerId: opts.playerId || null, token: opts.token || null,
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, mode: 0,
       hp: st.hp, maxHp: st.hp, alive: true, kills: 0, placement: 0,
       input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0 },
@@ -232,6 +280,7 @@ class Room {
       fireCd: 0, superCd: BALANCE.match.initialSuperCooldown,
       shieldT: 0, invulnT: 0, speedT: 0, stunT: 0, dashT: 0, dashX: 0, dashZ: 0, dashHit: null,
       rebirth: false, reviveT: 0,
+      hiddenT: 0, rapidT: 0, rageT: 0, smallT: 0, regenT: 0, regenRate: 0, dashY: 0, dashHeal: 0, thunder: null,
       ai: null,
     };
   }
@@ -248,7 +297,7 @@ class Room {
     }
     let i = 0;
     for (const p of this.players.values()) {
-      const b = this.makeBird({ name: p.name, rarity: p.rarity, playerId: p.id, token: p.token });
+      const b = this.makeBird({ name: p.name, bird: p.bird, playerId: p.id, token: p.token });
       this.placeBird(b, spawnPoints[i++]);
       this.birds.set(b.id, b);
       p.birdId = b.id;
@@ -260,7 +309,8 @@ class Room {
       // Bots lean toward lower rarities so a lobby isn't ten legendaries.
       const r = Math.random();
       const rarity = RARITY_KEYS[r < 0.3 ? 0 : r < 0.55 ? 1 : r < 0.75 ? 2 : r < 0.88 ? 3 : r < 0.96 ? 4 : 5];
-      const b = this.makeBird({ name, rarity, isBot: true });
+      const pool = BIRD_KEYS.filter(k => BALANCE.birds[k].rarity === rarity);
+      const b = this.makeBird({ name, bird: pool[Math.floor(Math.random() * pool.length)], isBot: true });
       this.initBotAI(b);
       this.placeBird(b, spawnPoints[i++]);
       this.birds.set(b.id, b);
@@ -278,7 +328,7 @@ class Room {
   startMessage() {
     return {
       type: 'start',
-      birds: [...this.birds.values()].map(b => ({ id: b.id, name: b.name, rarity: b.rarity, isBot: b.isBot, playerId: b.playerId, maxHp: b.maxHp })),
+      birds: [...this.birds.values()].map(b => ({ id: b.id, name: b.name, bird: b.bird, rarity: b.rarity, isBot: b.isBot, playerId: b.playerId, maxHp: b.maxHp })),
       pickups: [...this.pickups.values()],
       chests: [...this.chests.values()],
       storm: this.stormSnapshot(),
@@ -374,6 +424,9 @@ class Room {
     // timers
     b.shieldT = Math.max(0, b.shieldT - dt); b.invulnT = Math.max(0, b.invulnT - dt);
     b.speedT = Math.max(0, b.speedT - dt); b.stunT = Math.max(0, b.stunT - dt);
+    b.hiddenT = Math.max(0, b.hiddenT - dt); b.rapidT = Math.max(0, b.rapidT - dt); b.rageT = Math.max(0, b.rageT - dt); b.smallT = Math.max(0, b.smallT - dt);
+    if (b.regenT > 0) { b.regenT -= dt; b.hp = Math.min(b.maxHp, b.hp + b.regenRate * dt); }
+    if (b.thunder) this.updateThunder(b, dt);
     b.fireCd -= dt; b.superCd = Math.max(0, b.superCd - dt);
 
     // fly / land toggle (edge-triggered by a sequence number so no press is lost)
@@ -387,16 +440,16 @@ class Room {
     }
 
     // movement
-    const slow = b.stunT > 0 ? 0.4 : 1, boost = b.speedT > 0 ? BALANCE.pickups.speedMul : 1;
+    const slow = b.stunT > 0 ? 0.4 : 1, boost = (b.speedT > 0 ? BALANCE.pickups.speedMul : 1) * (b.smallT > 0 ? BALANCE.abilities.tinyTarget.speedMul : 1);
     moveBird(b, inp, dt, {
       speed: st.speed * boost * slow, flySpeed: st.flySpeed * boost * slow,
       climbSpeed: BALANCE.match.climbSpeed, fallSpeed: BALANCE.match.fallSpeed, maxAlt: BALANCE.match.maxAltitude,
-      dashSpeed: BALANCE.abilities.windDash.speed,
+      dashSpeed: b.dashSpeed || BALANCE.abilities.windDash.speed,
     });
-    if (b.dashT > 0) this.dashContact(b);
+    if (b.dashT > 0) this.dashContact(b); else b.dashY = 0;
 
     // firing
-    if (inp.fire && b.fireCd <= 0 && b.stunT <= 0) { this.fire(b, null, 1); b.fireCd = 1 / st.fireRate; }
+    if (inp.fire && b.fireCd <= 0 && b.stunT <= 0) { this.fire(b, null, 1); b.fireCd = 1 / (st.fireRate * (b.rapidT > 0 ? BALANCE.abilities.quickPeck.rateMul : 1)); }
 
     // super ability
     if (inp.superSeq !== b.lastSuperSeq) {
@@ -476,14 +529,14 @@ class Room {
     return { x: ax, z: az };
   }
   // Fires one feather. dirOverride = horizontal direction (for spread shots).
-  fire(b, dirOverride, dmgMul) {
+  fire(b, dirOverride, dmgMul, opts) {
     const st = BALANCE.rarities[b.rarity], PR = BALANCE.projectile;
     const aim = dirOverride || this.aimDir(b);
     const origin = { x: b.x + aim.x * 1.2, y: b.y + 0.7, z: b.z + aim.z * 1.2 };
     // Auto vertical aim: pick the nearest enemy roughly in the joystick direction and pitch toward it.
     let dir = { x: aim.x, y: 0, z: aim.z }, best = null, bestD = 75;
     for (const o of this.birds.values()) {
-      if (o === b || !o.alive) continue;
+      if (o === b || !o.alive || o.hiddenT > 0) continue;
       const dx = o.x - b.x, dz = o.z - b.z, d = Math.hypot(dx, dz);
       if (d > bestD || d < 0.5) continue;
       if ((dx * aim.x + dz * aim.z) / d < Math.cos(0.45)) continue;  // ~26 degree cone
@@ -495,31 +548,56 @@ class Room {
       const pitch = dy / l, hl = Math.sqrt(Math.max(0.05, 1 - pitch * pitch));
       dir = { x: aim.x * hl, y: pitch, z: aim.z * hl };
     }
-    const p = { id: uid(), owner: b.id, x: origin.x, y: origin.y, z: origin.z, vx: dir.x * PR.speed, vy: dir.y * PR.speed, vz: dir.z * PR.speed, ttl: PR.ttl, dmg: st.damage * (dmgMul || 1) };
+    const rage = b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1;
+    const p = { id: uid(), owner: b.id, x: origin.x, y: origin.y, z: origin.z, vx: dir.x * PR.speed, vy: dir.y * PR.speed, vz: dir.z * PR.speed, ttl: PR.ttl, dmg: st.damage * (dmgMul || 1) * rage };
+    if (opts) Object.assign(p, opts);        // homing / pierce / bomb / custom velocity
     this.projectiles.push(p);
-    this.events.push({ type: 'shot', id: p.id, o: b.id, x: r2(p.x), y: r2(p.y), z: r2(p.z), vx: r2(p.vx), vy: r2(p.vy), vz: r2(p.vz) });
+    this.events.push({ type: 'shot', id: p.id, o: b.id, x: r2(p.x), y: r2(p.y), z: r2(p.z), vx: r2(p.vx), vy: r2(p.vy), vz: r2(p.vz), kind: p.kind || 0, h: p.homing || 0, ttl: r2(p.ttl) });
+    return p;
   }
   updateProjectiles(dt) {
     const PR = BALANCE.projectile;
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
       const prev = { x: p.x, y: p.y, z: p.z };
+      if (p.homing) {                        // Flock Call: steer toward the target
+        const t = this.birds.get(p.homing);
+        if (t && t.alive) {
+          const dx = t.x - p.x, dy = t.y + 0.6 - p.y, dz = t.z - p.z, l = Math.hypot(dx, dy, dz) || 1, k = Math.min(1, BALANCE.abilities.flockCall.turnRate * dt);
+          const sp = Math.hypot(p.vx, p.vy, p.vz);
+          p.vx += (dx / l * sp - p.vx) * k; p.vy += (dy / l * sp - p.vy) * k; p.vz += (dz / l * sp - p.vz) * k;
+        }
+      }
+      if (p.gravity) p.vy -= p.gravity * dt;  // Fruit Bomb arcs
       p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt; p.ttl -= dt;
       let dead = p.ttl <= 0 || p.y < groundY(p.x, p.z);
       if (!dead) {
         const owner = this.birds.get(p.owner);
         for (const b of this.birds.values()) {
-          if (!b.alive || b.id === p.owner) continue;
-          const radius = b.mode === 1 ? PR.hitRadiusFlying : PR.hitRadiusGround;
+          if (!b.alive || b.id === p.owner || (p.hitSet && p.hitSet.has(b.id))) continue;
+          const radius = (b.mode === 1 ? PR.hitRadiusFlying : PR.hitRadiusGround) * (b.smallT > 0 ? BALANCE.abilities.tinyTarget.radiusMul : 1);
           if (segDist(prev, p, { x: b.x, y: b.y + 0.6, z: b.z }) < radius) {
+            if (p.bomb) { dead = true; break; }
             let dmg = p.dmg, dive = false;
             if (owner && owner.mode === 1 && b.mode === 0 && owner.y - b.y > PR.diveHeight && p.vy < -8) { dmg *= PR.diveBonus; dive = true; }
             this.applyDamage(b, dmg, owner, 'shot', false, { pid: p.id, dive });
+            if (p.pierce) { p.hitSet = p.hitSet || new Set(); p.hitSet.add(b.id); continue; }
             dead = true; break;
           }
         }
       }
-      if (dead) { this.projectiles.splice(i, 1); this.events.push({ type: 'pdead', id: p.id }); }
+      if (dead) {
+        this.projectiles.splice(i, 1); this.events.push({ type: 'pdead', id: p.id });
+        if (p.bomb) this.explode(p.x, p.y, p.z, p.bomb.radius, p.bomb.damage, this.birds.get(p.owner), 'bomb');
+      }
+    }
+  }
+  explode(x, y, z, radius, damage, attacker, cause) {
+    this.events.push({ type: 'explode', x: r2(x), y: r2(y), z: r2(z), r: radius });
+    for (const o of this.birds.values()) {
+      if (!o.alive || o === attacker) continue;
+      const d = Math.hypot(o.x - x, o.y - y, o.z - z);
+      if (d < radius) this.applyDamage(o, damage * (1 - 0.5 * d / radius), attacker, cause);
     }
   }
   // silent = no per-hit event (storm ticks). info = { pid, dive, reflect }
@@ -562,57 +640,122 @@ class Room {
     return p && p.ws ? { ws: p.ws } : null;
   }
 
-  /* ---------- abilities ---------- */
+  /* ---------- abilities: one case per `ability` key in BALANCE.birds ---------- */
+  nearestEnemy(b, range, ignoreHidden) {
+    let best = null, bd = range;
+    for (const o of this.birds.values()) { if (o !== b && o.alive && !(ignoreHidden && o.hiddenT > 0)) { const d = dist3(o, b); if (d < bd) { bd = d; best = o; } } }
+    return best;
+  }
+  enemiesWithin(b, range) { return [...this.birds.values()].filter(o => o !== b && o.alive && dist3(o, b) < range); }
+  startDash(b, aim, speed, duration, contactDamage, dashY, heal) {
+    b.dashT = duration; b.dashX = aim.x; b.dashZ = aim.z; b.dashY = dashY || 0; b.dashHit = new Set(); b.dashDmg = contactDamage; b.dashHeal = heal || 0; b.dashSpeed = speed;
+  }
   useAbility(b) {
-    const st = BALANCE.rarities[b.rarity], A = BALANCE.abilities, aim = this.aimDir(b);
-    const ev = { type: 'ability', b: b.id, kind: st.ability, x: r2(b.x), y: r2(b.y), z: r2(b.z) };
-    switch (st.ability) {
+    const A = BALANCE.abilities, aim = this.aimDir(b), kind = b.ability;
+    const ev = { type: 'ability', b: b.id, kind, x: r2(b.x), y: r2(b.y), z: r2(b.z) };
+    const target = (o) => { ev.target = o.id; ev.tx = r2(o.x); ev.ty = r2(o.y); ev.tz = r2(o.z); };
+    switch (kind) {
+      // ---- common
+      case 'quickPeck': b.rapidT = A.quickPeck.duration; break;
+      case 'invisibility': b.hiddenT = A.invisibility.duration; break;
       case 'featherBurst': {
         const base = Math.atan2(aim.x, aim.z), spread = A.featherBurst.spreadDeg * Math.PI / 180;
-        for (let i = 0; i < A.featherBurst.count; i++) {
-          const a = base - spread / 2 + spread * (i / (A.featherBurst.count - 1));
-          this.fire(b, { x: Math.sin(a), z: Math.cos(a) }, A.featherBurst.dmgMul);
-        }
+        for (let i = 0; i < A.featherBurst.count; i++) { const a = base - spread / 2 + spread * (i / (A.featherBurst.count - 1)); this.fire(b, { x: Math.sin(a), z: Math.cos(a) }, A.featherBurst.dmgMul); }
         break;
       }
-      case 'windDash':
-        b.dashT = A.windDash.duration; b.dashX = aim.x; b.dashZ = aim.z; b.dashHit = new Set();
-        ev.dx = r2(aim.x); ev.dz = r2(aim.z);
+      case 'flockCall': {
+        const t = this.nearestEnemy(b, 70, true); if (!t) return false;
+        target(t);
+        for (let i = 0; i < A.flockCall.count; i++) { const a = Math.atan2(aim.x, aim.z) + (i - 1.5) * 0.5; this.fire(b, { x: Math.sin(a), z: Math.cos(a) }, A.flockCall.dmgMul, { homing: t.id, ttl: 2.2, kind: 1 }); }
         break;
-      case 'healingNest':
-        this.nests.push({ x: b.x, y: b.y, z: b.z, t: A.healingNest.duration, owner: b.id });
+      }
+      case 'tinyTarget': b.smallT = A.tinyTarget.duration; break;
+      case 'seedSnack': b.hp = Math.min(b.maxHp, b.hp + A.seedSnack.heal); break;
+      // ---- rare
+      case 'screech': for (const o of this.enemiesWithin(b, A.screech.radius)) o.stunT = Math.max(o.stunT, A.screech.slow); break;
+      case 'crimsonRage': b.rageT = A.crimsonRage.duration; break;
+      case 'windDash': this.startDash(b, aim, A.windDash.speed, A.windDash.duration, A.windDash.contactDamage); ev.dx = r2(aim.x); ev.dz = r2(aim.z); break;
+      case 'stealShine': {
+        const t = this.nearestEnemy(b, A.stealShine.range); if (!t) return false;
+        target(t); this.applyDamage(t, A.stealShine.amount, b, 'steal'); b.hp = Math.min(b.maxHp, b.hp + A.stealShine.amount);
         break;
+      }
+      case 'drillShot': this.fire(b, null, A.drillShot.damage / BALANCE.rarities[b.rarity].damage, { pierce: true, ttl: 1.4, kind: 2 }); break;
+      // ---- super rare
+      case 'hush': for (const o of this.enemiesWithin(b, A.hush.radius)) { o.stunT = Math.max(o.stunT, A.hush.slow); o.superCd += A.hush.silence; } break;
+      case 'shadowShield': b.invulnT = A.shadowShield.duration; break;
+      case 'fruitBomb': {
+        const p = this.fire(b, null, 0, { kind: 3, ttl: 2.5, gravity: 40, bomb: { radius: A.fruitBomb.radius, damage: A.fruitBomb.damage } });
+        p.vx = aim.x * A.fruitBomb.speed; p.vz = aim.z * A.fruitBomb.speed; p.vy = A.fruitBomb.lob;
+        this.events[this.events.length - 1] = { type: 'shot', id: p.id, o: b.id, x: r2(p.x), y: r2(p.y), z: r2(p.z), vx: r2(p.vx), vy: r2(p.vy), vz: r2(p.vz), kind: 3, h: 0, ttl: r2(p.ttl) };
+        break;
+      }
+      case 'healingNest': this.nests.push({ x: b.x, y: b.y, z: b.z, t: A.healingNest.duration, owner: b.id }); break;
+      case 'rainbowRing': for (let i = 0; i < A.rainbowRing.count; i++) { const a = i / A.rainbowRing.count * Math.PI * 2; this.fire(b, { x: Math.sin(a), z: Math.cos(a) }, A.rainbowRing.dmgMul); } break;
+      // ---- epic
+      case 'stoop': this.startDash(b, aim, A.stoop.speed, A.stoop.duration, A.stoop.contactDamage, b.mode === 1 ? -A.stoop.dive : 0); ev.dx = r2(aim.x); ev.dz = r2(aim.z); break;
+      case 'frostTalons': {
+        const t = this.nearestEnemy(b, A.frostTalons.range); if (!t) return false;
+        target(t); this.applyDamage(t, A.frostTalons.damage, b, 'frost'); if (t.alive) t.stunT = Math.max(t.stunT, A.frostTalons.slow);
+        break;
+      }
+      case 'casqueBash': this.startDash(b, aim, A.casqueBash.speed, A.casqueBash.duration, A.casqueBash.contactDamage, 0, A.casqueBash.heal); ev.dx = r2(aim.x); ev.dz = r2(aim.z); break;
+      case 'fishHook': {
+        const t = this.nearestEnemy(b, A.fishHook.range); if (!t) return false;
+        target(t);
+        const dx = b.x - t.x, dz = b.z - t.z, d = Math.hypot(dx, dz) || 1;
+        t.x = b.x - dx / d * 3; t.z = b.z - dz / d * 3; t.y = Math.max(t.y, groundY(t.x, t.z)); t.vx = t.vz = 0; t.dashT = 0;
+        this.applyDamage(t, A.fishHook.damage, b, 'hook');
+        break;
+      }
       case 'stormTalons': {
-        let best = null, bd = A.stormTalons.range;
-        for (const o of this.birds.values()) { if (o !== b && o.alive) { const d = dist3(o, b); if (d < bd) { bd = d; best = o; } } }
-        if (!best) return false;                 // nothing in range: keep the super ready
-        ev.target = best.id; ev.tx = r2(best.x); ev.ty = r2(best.y); ev.tz = r2(best.z);
-        this.events.push(ev);
-        this.applyDamage(best, A.stormTalons.damage, b, 'lightning');
-        if (best.alive) best.stunT = A.stormTalons.slowDuration;
-        return true;
-      }
-      case 'shadowShield':
-        b.invulnT = A.shadowShield.duration;
+        const t = this.nearestEnemy(b, A.stormTalons.range); if (!t) return false;
+        target(t); this.applyDamage(t, A.stormTalons.damage, b, 'lightning'); if (t.alive) t.stunT = Math.max(t.stunT, A.stormTalons.slowDuration);
         break;
+      }
+      // ---- mythic
+      case 'freedomStrike': {
+        const list = this.enemiesWithin(b, A.freedomStrike.radius); if (!list.length) return false;
+        ev.targets = list.map(o => [r2(o.x), r2(o.y), r2(o.z)]);
+        for (const o of list) { this.applyDamage(o, A.freedomStrike.damage, b, 'lightning'); if (o.alive) o.stunT = Math.max(o.stunT, A.freedomStrike.slow); }
+        break;
+      }
+      case 'thermalRise': b.invulnT = A.thermalRise.invuln; b.regenT = A.thermalRise.regenTime; b.regenRate = A.thermalRise.regen / A.thermalRise.regenTime; b.speedT = A.thermalRise.speedTime; break;
+      case 'crushingGrip': {
+        const t = this.nearestEnemy(b, A.crushingGrip.range); if (!t) return false;
+        target(t); this.applyDamage(t, A.crushingGrip.damage, b, 'grip'); if (t.alive) t.stunT = Math.max(t.stunT, A.crushingGrip.slow);
+        break;
+      }
+      // ---- legendary
       case 'phoenixRebirth': {
         this.events.push(ev);
-        for (const o of this.birds.values()) {
-          if (o === b || !o.alive) continue;
-          const d = dist3(o, b);
-          if (d < A.phoenixRebirth.radius) this.applyDamage(o, A.phoenixRebirth.damage * (1 - 0.5 * d / A.phoenixRebirth.radius), b, 'phoenix');
-        }
+        for (const o of this.enemiesWithin(b, A.phoenixRebirth.radius)) this.applyDamage(o, A.phoenixRebirth.damage * (1 - 0.5 * dist3(o, b) / A.phoenixRebirth.radius), b, 'phoenix');
         b.rebirth = true;
         return true;
       }
+      case 'thunderstorm': b.thunder = { left: A.thunderstorm.bolts, timer: 0 }; break;
+      default: return false;
     }
     this.events.push(ev);
     return true;
   }
+  updateThunder(b, dt) {
+    const A = BALANCE.abilities.thunderstorm, th = b.thunder;
+    th.timer -= dt;
+    if (th.timer > 0) return;
+    th.timer = A.duration / A.bolts;
+    const list = this.enemiesWithin(b, A.radius);
+    if (list.length) {
+      const t = list[Math.floor(Math.random() * list.length)];
+      this.events.push({ type: 'ability', b: b.id, kind: 'stormTalons', x: r2(b.x), y: r2(b.y), z: r2(b.z), target: t.id, tx: r2(t.x), ty: r2(t.y), tz: r2(t.z), quiet: true });
+      this.applyDamage(t, A.damage, b, 'lightning'); if (t.alive) t.stunT = Math.max(t.stunT, A.slow);
+    }
+    if (--th.left <= 0) b.thunder = null;
+  }
   dashContact(b) {
     for (const o of this.birds.values()) {
       if (o === b || !o.alive || b.dashHit.has(o.id)) continue;
-      if (dist3(o, b) < 2.6) { b.dashHit.add(o.id); this.applyDamage(o, BALANCE.abilities.windDash.contactDamage, b, 'dash'); }
+      if (dist3(o, b) < 2.6) { b.dashHit.add(o.id); this.applyDamage(o, b.dashDmg, b, 'dash'); if (b.dashHeal) b.hp = Math.min(b.maxHp, b.hp + b.dashHeal); }
     }
   }
 
@@ -624,7 +767,7 @@ class Room {
     b.ai = { thinkT: Math.random() * 0.3, target: null, goal: null, wanderT: 0, flyT: rand(3, 10), strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, aimErr: 0 };
   }
   botThink(b, dt) {
-    const ai = b.ai, inp = b.input, S = this.storm, st = BALANCE.rarities[b.rarity];
+    const ai = b.ai, inp = b.input, S = this.storm;
     ai.thinkT -= dt; ai.flyT -= dt; ai.strafeT -= dt;
     if (ai.thinkT > 0) return;
     ai.thinkT = 0.2;
@@ -632,7 +775,7 @@ class Room {
 
     // nearest enemy
     let target = null, td = 70;
-    for (const o of this.birds.values()) { if (o !== b && o.alive) { const d = dist3(o, b); if (d < td) { td = d; target = o; } } }
+    for (const o of this.birds.values()) { if (o !== b && o.alive && o.hiddenT <= 0) { const d = dist3(o, b); if (d < td) { td = d; target = o; } } }
     ai.target = target;
 
     // where to go
@@ -686,9 +829,9 @@ class Room {
 
     // super ability
     if (b.superCd <= 0) {
-      const wants = (st.ability === 'healingNest' && b.hp < b.maxHp * 0.55) ||
-                    (st.ability === 'shadowShield' && target && td < 25 && b.hp < b.maxHp * 0.7) ||
-                    (target && td < 22 && st.ability !== 'healingNest');
+      const support = SUPPORT_ABILITIES.has(b.ability);
+      const wants = support ? (b.hp < b.maxHp * 0.55 && (target || b.ability === 'seedSnack' || b.ability === 'healingNest'))
+                            : (target && td < 22);
       if (wants) inp.superSeq++;
     }
   }
@@ -708,7 +851,8 @@ class Room {
   snapshot() {
     const birds = [];
     for (const b of this.birds.values()) {
-      const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.input.fire ? 32 : 0) | (b.rebirth ? 64 : 0);
+      const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.input.fire ? 32 : 0) | (b.rebirth ? 64 : 0)
+                  | (b.hiddenT > 0 ? 128 : 0) | (b.smallT > 0 ? 256 : 0) | (b.rageT > 0 ? 512 : 0) | (b.rapidT > 0 ? 1024 : 0);
       birds.push([b.id, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.mode, flags, b.alive ? 1 : 0, r2(b.superCd), b.kills]);
     }
     return { type: 'state', t: r2(this.time), birds, storm: this.stormSnapshot(), ev: this.events, alive: this.aliveBirds().length };
@@ -751,7 +895,7 @@ function tryReconnect(client, token) {
       p.id = client.id; p.ws = client.ws; room.players.set(p.id, p);
       b.playerId = client.id; client.room = room; client.bird = b;
       if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq }; }
-      send(client.ws, { type: 'welcome', id: client.id, token, balance: BALANCE, birdId: b.id, name: p.name, rarity: p.rarity, reconnected: true });
+      send(client.ws, { type: 'welcome', id: client.id, token, balance: BALANCE, birdId: b.id, name: p.name, bird: p.bird, reconnected: true });
       send(client.ws, room.startMessage());
       return true;
     }
@@ -763,14 +907,14 @@ function handleMessage(client, msg) {
   switch (msg.type) {
     case 'join': {
       const name = String(msg.name || 'Bird').replace(/[^\w \-]/g, '').trim().slice(0, 14) || 'Bird';
-      const rarity = RARITY_KEYS.includes(msg.rarity) ? msg.rarity : 'common';
+      const birdKey = BIRD_KEYS.includes(msg.bird) ? msg.bird : 'sparrow';
       const token = typeof msg.token === 'string' && msg.token.length <= 48 ? msg.token : null;
       leaveRoom(client);
       if (!msg.fresh && tryReconnect(client, token)) return;
       const newToken = crypto.randomBytes(12).toString('hex');
       const room = findLobbyRoom();
-      send(client.ws, { type: 'welcome', id: client.id, token: newToken, balance: BALANCE, name, rarity });
-      room.addPlayer(client, name, rarity, newToken);
+      send(client.ws, { type: 'welcome', id: client.id, token: newToken, balance: BALANCE, name, bird: birdKey });
+      room.addPlayer(client, name, birdKey, newToken);
       break;
     }
     case 'input': {
@@ -829,10 +973,14 @@ setInterval(() => {
   }
 }, 1000 / TICK_RATE);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Bird Game Ultimate server running on port ${PORT}`);
-  const ifaces = os.networkInterfaces();
-  for (const name of Object.keys(ifaces)) for (const i of ifaces[name]) {
-    if (i.family === 'IPv4' && !i.internal) console.log(`  open on your phone:  http://${i.address}:${PORT}`);
-  }
-});
+// --- start listening (skipped when this file is require()d by tests)
+if (require.main === module) {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Bird Game Ultimate server running on port ${PORT}`);
+    const ifaces = os.networkInterfaces();
+    for (const name of Object.keys(ifaces)) for (const i of ifaces[name]) {
+      if (i.family === 'IPv4' && !i.internal) console.log(`  open on your phone:  http://${i.address}:${PORT}`);
+    }
+  });
+}
+module.exports = { Room, BALANCE, BIRD_KEYS, DT, groundY, terrainHeight };
