@@ -27,54 +27,53 @@ const DT = 1 / TICK_RATE;
    1. CONFIG & BALANCE TABLE
    ============================================================================= */
 const BALANCE = {
-  // Rarity is only how unique / hard to unlock a bird is: every rarity has the SAME stats (birds differ by super, hitbox and the per-bird tweaks below).
-  // hp = max health, speed = ground speed, flySpeed = air speed,
-  // damage = the bird's strike strength (bite damage = damage x BALANCE.bite.dmgMul), superCooldown = seconds.
+  // Rarity is only how unique / hard to unlock a bird is (name, colour, super cooldown). It does NOT change combat stats.
+  // Combat stats are per bird (below), chosen from the real bird's size and speed: hp, speed (ground), fly (air), bite (damage), biteCd (seconds), hit (hitbox size).
   rarities: {
-    common:    { name: 'Common',     color: 0x9aa0a6, hp: 140, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 14 },
-    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 140, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 14 },
-    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 14 },
-    epic:      { name: 'Epic',       color: 0xa855f7, hp: 140, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 14 },
-    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 140, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 14 },
-    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 140, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 14 },
+    common:    { name: 'Common',     color: 0x9aa0a6, superCooldown: 14 },
+    rare:      { name: 'Rare',       color: 0x3b82f6, superCooldown: 14 },
+    superRare: { name: 'Super Rare', color: 0x22c55e, superCooldown: 14 },
+    epic:      { name: 'Epic',       color: 0xa855f7, superCooldown: 14 },
+    mythic:    { name: 'Mythic',     color: 0xef4444, superCooldown: 14 },
+    legendary: { name: 'Legendary',  color: 0xf59e0b, superCooldown: 14 },
   },
   // The 26 birds. Stats come from the rarity above; each bird has its own body color and super ability.
   // `ability` keys map to cases in Room.useAbility(); tune their numbers in `abilities` below.
   birds: {
-    sparrow:    { n: 1,  name: 'Sparrow',          ru: 'Воробей',            rarity: 'common',    hit: 'small', body: 0x8b6b4a, ability: 'quickPeck',      abilityName: 'Quick Peck',       abilityDesc: 'Double bite speed for 4s.' },
-    pigeon:     { n: 2,  name: 'Pigeon',           ru: 'Голубь',             rarity: 'common',    hit: 'mid', body: 0x8d93a8, ability: 'invisibility',   abilityName: 'Invisibility',     abilityDesc: 'Vanish for 7s. Enemies and bots cannot see or target you.' },
-    robin:      { n: 3,  name: 'Robin',            ru: 'Малиновка',          rarity: 'common',    hit: 'small', body: 0xc9613b, ability: 'featherBurst',   abilityName: 'Feather Burst',    abilityDesc: 'Fires a wide spread of 7 feathers.' },
-    starling:   { n: 4,  name: 'Starling',         ru: 'Скворец',            rarity: 'common',    hit: 'small', body: 0x2f3b4a, ability: 'flockCall',      abilityName: 'Flock Call',       abilityDesc: 'Sends 4 homing feathers after the nearest enemy.' },
-    wren:       { n: 5,  name: 'Wren',             ru: 'Крапивник',          rarity: 'common',    hit: 'small', body: 0x9c7a55, ability: 'tinyTarget',     abilityName: 'Tiny Target',      abilityDesc: 'Shrink for 6s: half as easy to hit and 25% faster.' },
-    finch:      { n: 6,  name: 'Finch',            ru: 'Зяблик',             rarity: 'common',    hit: 'small', body: 0xd98c5f, ability: 'seedSnack',      abilityName: 'Seed Snack',       abilityDesc: 'Instantly heal 40 HP.' },
-    blueJay:    { n: 7,  name: 'Blue Jay',         ru: 'Голубая сойка',      rarity: 'rare',      hit: 'mid', body: 0x3b82f6, ability: 'screech',        abilityName: 'Mimic Screech',    abilityDesc: 'Every enemy within 16 is slowed for 2s.' },
-    cardinal:   { n: 8,  name: 'Cardinal',         ru: 'Кардинал',           rarity: 'rare',      hit: 'small', body: 0xd7263d, ability: 'crimsonRage',    abilityName: 'Crimson Rage',     abilityDesc: '+60% damage for 5s.' },
-    kingfisher: { n: 9,  name: 'Kingfisher',       ru: 'Зимородок',          rarity: 'rare',      hit: 'small', body: 0x1f9dd9, ability: 'windDash',       abilityName: 'Dive Strike',      abilityDesc: 'Blast forward at high speed, hurting anyone you pass.' },
-    magpie:     { n: 10, name: 'Magpie',           ru: 'Сорока',             rarity: 'rare',      hit: 'mid', body: 0x1e1e2a, ability: 'stealShine',     abilityName: 'Steal Shine',      abilityDesc: 'Take 30 HP from the nearest enemy within 22 and keep it.' },
-    woodpecker: { n: 11, name: 'Woodpecker',       ru: 'Дятел',              rarity: 'rare',      hit: 'mid', body: 0xb03030, ability: 'drillShot',      abilityName: 'Drill Shot',       abilityDesc: 'One heavy feather (45 dmg) that pierces through every bird in its path.' },
-    barnOwl:    { n: 12, name: 'Barn Owl',         ru: 'Сипуха',             rarity: 'superRare', hit: 'mid', body: 0xe8d8b8, ability: 'hush',           abilityName: 'Hush',             abilityDesc: 'Enemies within 22 are slowed 2s and their super is delayed by 6s.' },
-    raven:      { n: 13, name: 'Raven',            ru: 'Ворон',              rarity: 'superRare', hit: 'mid', body: 0x15151d, ability: 'shadowShield',   abilityName: 'Shadow Shield',    abilityDesc: 'Become invulnerable for 4s and reflect all damage back.' },
-    toucan:     { n: 14, name: 'Toucan',           ru: 'Тукан',              rarity: 'superRare', hit: 'mid', body: 0x1a1a1a, ability: 'fruitBomb',      abilityName: 'Fruit Bomb',       abilityDesc: 'Lob a fruit that explodes for 55 damage in a radius of 8.' },
-    flamingo:   { n: 15, name: 'Flamingo',         ru: 'Фламинго',           rarity: 'superRare', hit: 'large', body: 0xf07aa8, ability: 'healingNest',    abilityName: 'Healing Nest',     abilityDesc: 'Drops a nest that heals every bird inside it for 5s.' },
-    macaw:      { n: 16, name: 'Macaw',            ru: 'Ара',                rarity: 'superRare', hit: 'mid', body: 0xe63946, ability: 'rainbowRing',    abilityName: 'Rainbow Ring',     abilityDesc: 'Fires 12 feathers in every direction at once.' },
-    peregrine:  { n: 17, name: 'Peregrine Falcon', ru: 'Сапсан',             rarity: 'epic',      hit: 'mid', body: 0x4a5a6b, ability: 'stoop',          abilityName: 'Stoop',            abilityDesc: 'The fastest dive in nature: rocket forward and down, 60 damage on contact.' },
-    snowyOwl:   { n: 18, name: 'Snowy Owl',        ru: 'Белая сова',         rarity: 'epic',      hit: 'large', body: 0xf2f2f2, ability: 'frostTalons',    abilityName: 'Frost Talons',     abilityDesc: 'Freeze the nearest enemy within 40: 40 damage and a 3s slow.' },
-    hornbill:   { n: 19, name: 'Hornbill',         ru: 'Птица-носорог',      rarity: 'epic',      hit: 'large', body: 0x222222, ability: 'casqueBash',     abilityName: 'Casque Bash',      abilityDesc: 'Charge forward; each bird you hit takes 40 and heals you 20.' },
-    osprey:     { n: 20, name: 'Osprey',           ru: 'Скопа',              rarity: 'epic',      hit: 'mid', body: 0x6b5a48, ability: 'fishHook',       abilityName: 'Fish Hook',        abilityDesc: 'Yank the nearest enemy within 35 to your side and deal 35.' },
-    goldenEagle:{ n: 21, name: 'Golden Eagle',     ru: 'Беркут',             rarity: 'epic',      hit: 'large', body: 0x8a5a23, ability: 'stormTalons',    abilityName: 'Storm Talons',     abilityDesc: 'Calls lightning down on the nearest enemy, damaging and slowing it.' },
-    baldEagle:  { n: 22, name: 'Bald Eagle',       ru: 'Белоголовый орлан',  rarity: 'mythic',    hit: 'large', body: 0x4a3826, ability: 'freedomStrike',  abilityName: 'Freedom Strike',   abilityDesc: 'Lightning hits every enemy within 30 for 45.' },
-    condor:     { n: 23, name: 'Andean Condor',    ru: 'Андский кондор',     rarity: 'mythic',    hit: 'large', body: 0x2a2a2a, ability: 'thermalRise',    abilityName: 'Thermal Rise',     abilityDesc: 'Untouchable for 2s, then regenerate 70 HP over 5s with a speed boost.' },
-    harpy:      { n: 24, name: 'Harpy Eagle',      ru: 'Гарпия',             rarity: 'mythic',    hit: 'large', body: 0x6a7a8a, ability: 'crushingGrip',   abilityName: 'Crushing Grip',    abilityDesc: 'Seize the nearest enemy within 25: 95 damage and a 2.5s slow.' },
-    phoenix:    { n: 25, name: 'Phoenix',          ru: 'Феникс',             rarity: 'legendary', hit: 'large', body: 0xff7a1a, ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth',  abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
-    thunderbird:{ n: 26, name: 'Thunderbird',      ru: 'Птица грома',        rarity: 'legendary', hit: 'large', body: 0x3a3a9a, ability: 'thunderstorm',   abilityName: 'Thunderstorm',     abilityDesc: '6 lightning bolts over 3s on random enemies within 45, 40 damage each.' },
-    // Hummingbird: tiny hitbox, very rapid but light bites, fastest in the game; fewer HP and weak bites keep it fair. Overrides: hpMul, speedMul, biteCooldown (s), biteDmgMul.
-    hummingbird:{ n: 27, name: 'Hummingbird',      ru: 'Колибри',            rarity: 'legendary', hit: 'tiny',  body: 0x1fae7a, ability: 'hyperRush',      abilityName: 'Hyper Rush',       abilityDesc: 'Speed boost: even faster for 5s (the fastest bird in the game).', hpMul: 0.65, speedMul: 1.2, biteCooldown: 0.3, biteDmgMul: 0.45 },
+    sparrow:    { n: 1,  name: 'Sparrow',          ru: 'Воробей',            rarity: 'common',    hp: 80, speed: 12, fly: 20, bite: 20, biteCd: 0.5, hit: 'small', body: 0x8b6b4a, ability: 'quickPeck',      abilityName: 'Quick Peck',       abilityDesc: 'Double bite speed for 4s.' },
+    pigeon:     { n: 2,  name: 'Pigeon',           ru: 'Голубь',             rarity: 'common',    hp: 95, speed: 12, fly: 23, bite: 22, biteCd: 0.55, hit: 'mid', body: 0x8d93a8, ability: 'invisibility',   abilityName: 'Invisibility',     abilityDesc: 'Vanish for 7s. Enemies and bots cannot see or target you.' },
+    robin:      { n: 3,  name: 'Robin',            ru: 'Малиновка',          rarity: 'common',    hp: 75, speed: 11.5, fly: 19, bite: 19, biteCd: 0.5, hit: 'small', body: 0xc9613b, ability: 'featherBurst',   abilityName: 'Feather Burst',    abilityDesc: 'Fires a wide spread of 7 feathers.' },
+    starling:   { n: 4,  name: 'Starling',         ru: 'Скворец',            rarity: 'common',    hp: 85, speed: 12, fly: 22, bite: 21, biteCd: 0.5, hit: 'small', body: 0x2f3b4a, ability: 'flockCall',      abilityName: 'Flock Call',       abilityDesc: 'Sends 4 homing feathers after the nearest enemy.' },
+    wren:       { n: 5,  name: 'Wren',             ru: 'Крапивник',          rarity: 'common',    hp: 65, speed: 12, fly: 18, bite: 17, biteCd: 0.4, hit: 'small', body: 0x9c7a55, ability: 'tinyTarget',     abilityName: 'Tiny Target',      abilityDesc: 'Shrink for 6s: half as easy to hit and 25% faster.' },
+    finch:      { n: 6,  name: 'Finch',            ru: 'Зяблик',             rarity: 'common',    hp: 78, speed: 11.5, fly: 19, bite: 20, biteCd: 0.5, hit: 'small', body: 0xd98c5f, ability: 'seedSnack',      abilityName: 'Seed Snack',       abilityDesc: 'Instantly heal 40 HP.' },
+    blueJay:    { n: 7,  name: 'Blue Jay',         ru: 'Голубая сойка',      rarity: 'rare',      hp: 95, speed: 12, fly: 21, bite: 25, biteCd: 0.6, hit: 'mid', body: 0x3b82f6, ability: 'screech',        abilityName: 'Mimic Screech',    abilityDesc: 'Every enemy within 16 is slowed for 2s.' },
+    cardinal:   { n: 8,  name: 'Cardinal',         ru: 'Кардинал',           rarity: 'rare',      hp: 85, speed: 12, fly: 20, bite: 24, biteCd: 0.55, hit: 'small', body: 0xd7263d, ability: 'crimsonRage',    abilityName: 'Crimson Rage',     abilityDesc: '+60% damage for 5s.' },
+    kingfisher: { n: 9,  name: 'Kingfisher',       ru: 'Зимородок',          rarity: 'rare',      hp: 85, speed: 12, fly: 22, bite: 27, biteCd: 0.55, hit: 'small', body: 0x1f9dd9, ability: 'windDash',       abilityName: 'Dive Strike',      abilityDesc: 'Blast forward at high speed, hurting anyone you pass.' },
+    magpie:     { n: 10, name: 'Magpie',           ru: 'Сорока',             rarity: 'rare',      hp: 110, speed: 12.5, fly: 21, bite: 26, biteCd: 0.6, hit: 'mid', body: 0x1e1e2a, ability: 'stealShine',     abilityName: 'Steal Shine',      abilityDesc: 'Take 30 HP from the nearest enemy within 22 and keep it.' },
+    woodpecker: { n: 11, name: 'Woodpecker',       ru: 'Дятел',              rarity: 'rare',      hp: 95, speed: 11.5, fly: 19, bite: 24, biteCd: 0.45, hit: 'mid', body: 0xb03030, ability: 'drillShot',      abilityName: 'Drill Shot',       abilityDesc: 'One heavy feather (45 dmg) that pierces through every bird in its path.' },
+    barnOwl:    { n: 12, name: 'Barn Owl',         ru: 'Сипуха',             rarity: 'superRare', hp: 125, speed: 12, fly: 21, bite: 30, biteCd: 0.7, hit: 'mid', body: 0xe8d8b8, ability: 'hush',           abilityName: 'Hush',             abilityDesc: 'Enemies within 22 are slowed 2s and their super is delayed by 6s.' },
+    raven:      { n: 13, name: 'Raven',            ru: 'Ворон',              rarity: 'superRare', hp: 150, speed: 12.5, fly: 22, bite: 38, biteCd: 0.8, hit: 'mid', body: 0x15151d, ability: 'shadowShield',   abilityName: 'Shadow Shield',    abilityDesc: 'Become invulnerable for 4s and reflect all damage back.' },
+    toucan:     { n: 14, name: 'Toucan',           ru: 'Тукан',              rarity: 'superRare', hp: 135, speed: 11.5, fly: 19, bite: 40, biteCd: 0.85, hit: 'mid', body: 0x1a1a1a, ability: 'fruitBomb',      abilityName: 'Fruit Bomb',       abilityDesc: 'Lob a fruit that explodes for 55 damage in a radius of 8.' },
+    flamingo:   { n: 15, name: 'Flamingo',         ru: 'Фламинго',           rarity: 'superRare', hp: 175, speed: 12.5, fly: 21, bite: 32, biteCd: 0.9, hit: 'large', body: 0xf07aa8, ability: 'healingNest',    abilityName: 'Healing Nest',     abilityDesc: 'Drops a nest that heals every bird inside it for 5s.' },
+    macaw:      { n: 16, name: 'Macaw',            ru: 'Ара',                rarity: 'superRare', hp: 145, speed: 12, fly: 22, bite: 42, biteCd: 0.85, hit: 'mid', body: 0xe63946, ability: 'rainbowRing',    abilityName: 'Rainbow Ring',     abilityDesc: 'Fires 12 feathers in every direction at once.' },
+    peregrine:  { n: 17, name: 'Peregrine Falcon', ru: 'Сапсан',             rarity: 'epic',      hp: 130, speed: 13, fly: 26, bite: 38, biteCd: 0.65, hit: 'mid', body: 0x4a5a6b, ability: 'stoop',          abilityName: 'Stoop',            abilityDesc: 'The fastest dive in nature: rocket forward and down, 60 damage on contact.' },
+    snowyOwl:   { n: 18, name: 'Snowy Owl',        ru: 'Белая сова',         rarity: 'epic',      hp: 170, speed: 12.5, fly: 22, bite: 40, biteCd: 0.85, hit: 'large', body: 0xf2f2f2, ability: 'frostTalons',    abilityName: 'Frost Talons',     abilityDesc: 'Freeze the nearest enemy within 40: 40 damage and a 3s slow.' },
+    hornbill:   { n: 19, name: 'Hornbill',         ru: 'Птица-носорог',      rarity: 'epic',      hp: 180, speed: 12, fly: 20, bite: 45, biteCd: 0.95, hit: 'large', body: 0x222222, ability: 'casqueBash',     abilityName: 'Casque Bash',      abilityDesc: 'Charge forward; each bird you hit takes 40 and heals you 20.' },
+    osprey:     { n: 20, name: 'Osprey',           ru: 'Скопа',              rarity: 'epic',      hp: 150, speed: 12.5, fly: 24, bite: 40, biteCd: 0.75, hit: 'mid', body: 0x6b5a48, ability: 'fishHook',       abilityName: 'Fish Hook',        abilityDesc: 'Yank the nearest enemy within 35 to your side and deal 35.' },
+    goldenEagle:{ n: 21, name: 'Golden Eagle',     ru: 'Беркут',             rarity: 'epic',      hp: 190, speed: 13, fly: 25, bite: 48, biteCd: 0.9, hit: 'large', body: 0x8a5a23, ability: 'stormTalons',    abilityName: 'Storm Talons',     abilityDesc: 'Calls lightning down on the nearest enemy, damaging and slowing it.' },
+    baldEagle:  { n: 22, name: 'Bald Eagle',       ru: 'Белоголовый орлан',  rarity: 'mythic',    hp: 200, speed: 13, fly: 24, bite: 50, biteCd: 0.95, hit: 'large', body: 0x4a3826, ability: 'freedomStrike',  abilityName: 'Freedom Strike',   abilityDesc: 'Lightning hits every enemy within 30 for 45.' },
+    condor:     { n: 23, name: 'Andean Condor',    ru: 'Андский кондор',     rarity: 'mythic',    hp: 260, speed: 11, fly: 22, bite: 52, biteCd: 1.1, hit: 'huge', body: 0x2a2a2a, ability: 'thermalRise',    abilityName: 'Thermal Rise',     abilityDesc: 'Untouchable for 2s, then regenerate 70 HP over 5s with a speed boost.' },
+    harpy:      { n: 24, name: 'Harpy Eagle',      ru: 'Гарпия',             rarity: 'mythic',    hp: 220, speed: 12.5, fly: 22, bite: 58, biteCd: 1, hit: 'large', body: 0x6a7a8a, ability: 'crushingGrip',   abilityName: 'Crushing Grip',    abilityDesc: 'Seize the nearest enemy within 25: 95 damage and a 2.5s slow.' },
+    phoenix:    { n: 25, name: 'Phoenix',          ru: 'Феникс',             rarity: 'legendary', hp: 190, speed: 13, fly: 24, bite: 45, biteCd: 0.8, hit: 'large', body: 0xff7a1a, ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth',  abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
+    thunderbird:{ n: 26, name: 'Thunderbird',      ru: 'Птица грома',        rarity: 'legendary', hp: 230, speed: 12.5, fly: 23, bite: 55, biteCd: 1, hit: 'large', body: 0x3a3a9a, ability: 'thunderstorm',   abilityName: 'Thunderstorm',     abilityDesc: '6 lightning bolts over 3s on random enemies within 45, 40 damage each.' },
+    // Hummingbird: tiny hitbox, very rapid but light bites, the fastest bird in the game.
+    hummingbird:{ n: 27, name: 'Hummingbird',      ru: 'Колибри',            rarity: 'legendary', hp: 70, speed: 14.5, fly: 28, bite: 12, biteCd: 0.3, hit: 'tiny', body: 0x1fae7a, ability: 'hyperRush',      abilityName: 'Hyper Rush',       abilityDesc: 'Speed boost: even faster for 5s (the fastest bird in the game).' },
   },
   // Bite: the one basic attack every bird has. Short range, single target, nearest enemy in front (a wide arc), damage = the
-  // bird's rarity damage x dmgMul. A flying bird biting a ground bird while diving (stoop) deals projectile.diveBonus x.
+  // bird's own bite damage. A flying bird biting a ground bird while diving (stoop) deals projectile.diveBonus x.
   // hitbox: size classes scale how easy a bird is to hit (shots) and to bite.
-  hitbox: { tiny: 0.5, small: 0.8, mid: 1.0, large: 1.25 },
-  bite: { range: 4.6, coneDeg: 120, cooldown: 0.7, dmgMul: 2.2 },
+  hitbox: { tiny: 0.5, small: 0.8, mid: 1.0, large: 1.25, huge: 1.4 },
+  bite: { range: 4.6, coneDeg: 120, dmgMul: 2.2 },   // bite damage and cooldown are per bird; dmgMul only scales feather shots from the bite damage,
   projectile: {
     speed: 70, ttl: 1.1,
     hitRadiusGround: 1.8,   // easier to hit birds on the ground
@@ -278,11 +277,11 @@ class Room {
 
   /* ---------- match start ---------- */
   makeBird(opts) {
-    const bird = BALANCE.birds[opts.bird], st = BALANCE.rarities[bird.rarity];
+    const bird = BALANCE.birds[opts.bird];
     return {
       id: uid(), name: opts.name, bird: opts.bird, rarity: bird.rarity, ability: bird.ability, isBot: !!opts.isBot, playerId: opts.playerId || null, token: opts.token || null,
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, mode: 0,
-      hp: Math.round(st.hp * (bird.hpMul || 1)), maxHp: Math.round(st.hp * (bird.hpMul || 1)), hitMul: BALANCE.hitbox[bird.hit] || 1, alive: true, kills: 0, placement: 0,
+      hp: bird.hp, maxHp: bird.hp, hitMul: BALANCE.hitbox[bird.hit] || 1, alive: true, kills: 0, placement: 0,
       input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, flySeq: 0, superSeq: 0, biteSeq: 0 },
       lastFlySeq: 0, lastSuperSeq: 0, lastBiteSeq: 0, biteCd: 0,
       superCd: BALANCE.match.initialSuperCooldown,
@@ -449,9 +448,9 @@ class Room {
 
     // movement
     const slow = b.stunT > 0 ? 0.4 : 1, boost = (b.speedT > 0 ? BALANCE.pickups.speedMul : 1) * (b.smallT > 0 ? BALANCE.abilities.tinyTarget.speedMul : 1)
-      * (b.rushT > 0 ? BALANCE.abilities.hyperRush.speedMul : 1) * (BALANCE.birds[b.bird].speedMul || 1);
+      * (b.rushT > 0 ? BALANCE.abilities.hyperRush.speedMul : 1);
     moveBird(b, inp, dt, {
-      speed: st.speed * boost * slow, flySpeed: st.flySpeed * boost * slow,
+      speed: BALANCE.birds[b.bird].speed * boost * slow, flySpeed: BALANCE.birds[b.bird].fly * boost * slow,
       climbSpeed: BALANCE.match.climbSpeed, fallSpeed: BALANCE.match.fallSpeed, maxAlt: BALANCE.match.maxAltitude,
       dashSpeed: b.dashSpeed || BALANCE.abilities.windDash.speed,
     });
@@ -534,6 +533,7 @@ class Room {
   /* =============================================================================
      5. COMBAT
      ============================================================================= */
+  strike(b) { return BALANCE.birds[b.bird].bite / BALANCE.bite.dmgMul; }   // base for feather-shot damage (shot dmg = strike x dmgMul)
   aimDir(b) {
     let ax = b.input.ax, az = b.input.az;
     const l = Math.hypot(ax, az);
@@ -542,7 +542,7 @@ class Room {
   }
   // Fires one feather. dirOverride = horizontal direction (for spread shots).
   fire(b, dirOverride, dmgMul, opts) {
-    const st = BALANCE.rarities[b.rarity], PR = BALANCE.projectile;
+    const PR = BALANCE.projectile;
     const aim = dirOverride || this.aimDir(b);
     const origin = { x: b.x + aim.x * 1.2, y: b.y + 0.7, z: b.z + aim.z * 1.2 };
     // Auto vertical aim: pick the nearest enemy roughly in the joystick direction and pitch toward it.
@@ -561,7 +561,7 @@ class Room {
       dir = { x: aim.x * hl, y: pitch, z: aim.z * hl };
     }
     const rage = b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1;
-    const p = { id: uid(), owner: b.id, x: origin.x, y: origin.y, z: origin.z, vx: dir.x * PR.speed, vy: dir.y * PR.speed, vz: dir.z * PR.speed, ttl: PR.ttl, dmg: st.damage * (dmgMul || 1) * rage };
+    const p = { id: uid(), owner: b.id, x: origin.x, y: origin.y, z: origin.z, vx: dir.x * PR.speed, vy: dir.y * PR.speed, vz: dir.z * PR.speed, ttl: PR.ttl, dmg: this.strike(b) * (dmgMul || 1) * rage };
     if (opts) Object.assign(p, opts);        // homing / pierce / bomb / custom velocity
     this.projectiles.push(p);
     this.events.push({ type: 'shot', id: p.id, o: b.id, x: r2(p.x), y: r2(p.y), z: r2(p.z), vx: r2(p.vx), vy: r2(p.vy), vz: r2(p.vz), kind: p.kind || 0, h: p.homing || 0, ttl: r2(p.ttl) });
@@ -664,14 +664,14 @@ class Room {
       if (hd > 0.8 && (dx * fx + dz * fz) / hd < cone) continue;   // must be in front (very close birds always count)
       best = o; bd = d;
     }
-    b.biteCd = (BALANCE.birds[b.bird].biteCooldown || B.cooldown) / (b.rapidT > 0 ? BALANCE.abilities.quickPeck.rateMul : 1);   // Sparrow's Quick Peck
+    b.biteCd = BALANCE.birds[b.bird].biteCd / (b.rapidT > 0 ? BALANCE.abilities.quickPeck.rateMul : 1);   // Sparrow's Quick Peck
     const ev = { type: 'bite', b: b.id, x: r2(b.x), y: r2(b.y), z: r2(b.z), yaw: r2(b.yaw), hit: false };
     if (best) {
       b.yaw = Math.atan2(best.x - b.x, best.z - b.z);                // snap to face the victim
       ev.yaw = r2(b.yaw); ev.hit = true; ev.tx = r2(best.x); ev.ty = r2(best.y); ev.tz = r2(best.z);
       this.events.push(ev);
       const dive = b.mode === 1 && best.mode === 0 && b.vy < -5;   // stooping onto a bird on the ground
-      let dmg = BALANCE.rarities[b.rarity].damage * B.dmgMul * (BALANCE.birds[b.bird].biteDmgMul || 1) * (b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1);
+      let dmg = BALANCE.birds[b.bird].bite * (b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1);
       if (dive) dmg *= BALANCE.projectile.diveBonus;
       this.applyDamage(best, dmg, b, 'bite', false, { dive });
     } else this.events.push(ev);
@@ -718,7 +718,7 @@ class Room {
         target(t); this.applyDamage(t, A.stealShine.amount, b, 'steal'); b.hp = Math.min(b.maxHp, b.hp + A.stealShine.amount);
         break;
       }
-      case 'drillShot': this.fire(b, null, A.drillShot.damage / BALANCE.rarities[b.rarity].damage, { pierce: true, ttl: 1.4, kind: 2 }); break;
+      case 'drillShot': this.fire(b, null, A.drillShot.damage / this.strike(b), { pierce: true, ttl: 1.4, kind: 2 }); break;
       // ---- super rare
       case 'hush': for (const o of this.enemiesWithin(b, A.hush.radius)) { o.stunT = Math.max(o.stunT, A.hush.slow); o.superCd += A.hush.silence; } break;
       case 'shadowShield': b.invulnT = A.shadowShield.duration; break;
