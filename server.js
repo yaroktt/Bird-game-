@@ -67,6 +67,8 @@ const BALANCE = {
     phoenix:    { n: 25, name: 'Phoenix',          ru: 'Феникс',             rarity: 'legendary', body: 0xff7a1a, ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth',  abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
     thunderbird:{ n: 26, name: 'Thunderbird',      ru: 'Птица грома',        rarity: 'legendary', body: 0x3a3a9a, ability: 'thunderstorm',   abilityName: 'Thunderstorm',     abilityDesc: '6 lightning bolts over 3s on random enemies within 45, 40 damage each.' },
   },
+  // Bite: every bird has it. Short range, single target, damage = the bird's rarity damage x dmgMul.
+  bite: { range: 4.6, coneDeg: 80, cooldown: 0.7, dmgMul: 2.2 },
   projectile: {
     speed: 70, ttl: 1.1,
     hitRadiusGround: 1.8,   // easier to hit birds on the ground
@@ -275,8 +277,8 @@ class Room {
       id: uid(), name: opts.name, bird: opts.bird, rarity: bird.rarity, ability: bird.ability, isBot: !!opts.isBot, playerId: opts.playerId || null, token: opts.token || null,
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, mode: 0,
       hp: st.hp, maxHp: st.hp, alive: true, kills: 0, placement: 0,
-      input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0 },
-      lastFlySeq: 0, lastSuperSeq: 0,
+      input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0, biteSeq: 0 },
+      lastFlySeq: 0, lastSuperSeq: 0, lastBiteSeq: 0, biteCd: 0,
       fireCd: 0, superCd: BALANCE.match.initialSuperCooldown,
       shieldT: 0, invulnT: 0, speedT: 0, stunT: 0, dashT: 0, dashX: 0, dashZ: 0, dashHit: null,
       rebirth: false, reviveT: 0,
@@ -427,7 +429,7 @@ class Room {
     b.hiddenT = Math.max(0, b.hiddenT - dt); b.rapidT = Math.max(0, b.rapidT - dt); b.rageT = Math.max(0, b.rageT - dt); b.smallT = Math.max(0, b.smallT - dt);
     if (b.regenT > 0) { b.regenT -= dt; b.hp = Math.min(b.maxHp, b.hp + b.regenRate * dt); }
     if (b.thunder) this.updateThunder(b, dt);
-    b.fireCd -= dt; b.superCd = Math.max(0, b.superCd - dt);
+    b.fireCd -= dt; b.superCd = Math.max(0, b.superCd - dt); b.biteCd = Math.max(0, b.biteCd - dt);
 
     // fly / land toggle (edge-triggered by a sequence number so no press is lost)
     if (inp.flySeq !== b.lastFlySeq) {
@@ -455,6 +457,12 @@ class Room {
     if (inp.superSeq !== b.lastSuperSeq) {
       b.lastSuperSeq = inp.superSeq;
       if (b.superCd <= 0 && b.stunT <= 0 && this.useAbility(b)) b.superCd = st.superCooldown;
+    }
+
+    // bite (edge-triggered like fly/super so a quick tap is never lost)
+    if (inp.biteSeq !== b.lastBiteSeq) {
+      b.lastBiteSeq = inp.biteSeq;
+      if (b.biteCd <= 0 && b.stunT <= 0) this.bite(b);
     }
 
     // storm damage
@@ -638,6 +646,28 @@ class Room {
     if (!b.playerId) return null;
     const p = this.players.get(b.playerId);
     return p && p.ws ? { ws: p.ws } : null;
+  }
+
+  /* ---------- bite ---------- */
+  bite(b) {
+    const B = BALANCE.bite, cone = Math.cos(B.coneDeg * Math.PI / 180);
+    const fx = Math.sin(b.yaw), fz = Math.cos(b.yaw);
+    let best = null, bd = B.range;
+    for (const o of this.birds.values()) {
+      if (o === b || !o.alive || o.hiddenT > 0) continue;
+      const dx = o.x - b.x, dz = o.z - b.z, hd = Math.hypot(dx, dz), d = dist3(o, b);
+      if (d > bd) continue;
+      if (hd > 0.8 && (dx * fx + dz * fz) / hd < cone) continue;   // must be in front (very close birds always count)
+      best = o; bd = d;
+    }
+    b.biteCd = B.cooldown;
+    const ev = { type: 'bite', b: b.id, x: r2(b.x), y: r2(b.y), z: r2(b.z), yaw: r2(b.yaw), hit: false };
+    if (best) {
+      b.yaw = Math.atan2(best.x - b.x, best.z - b.z);                // snap to face the victim
+      ev.yaw = r2(b.yaw); ev.hit = true; ev.tx = r2(best.x); ev.ty = r2(best.y); ev.tz = r2(best.z);
+      this.events.push(ev);
+      this.applyDamage(best, BALANCE.rarities[b.rarity].damage * B.dmgMul * (b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1), b, 'bite');
+    } else this.events.push(ev);
   }
 
   /* ---------- abilities: one case per `ability` key in BALANCE.birds ---------- */
@@ -827,6 +857,9 @@ class Room {
       if (ai.flyT <= 0 && Math.random() < 0.35 && !target) { inp.flySeq++; ai.flyT = rand(6, 14); }
     }
 
+    // bite anything that gets close
+    if (target && td < BALANCE.bite.range - 0.4 && b.biteCd <= 0) inp.biteSeq++;
+
     // super ability
     if (b.superCd <= 0) {
       const support = SUPPORT_ABILITIES.has(b.ability);
@@ -853,7 +886,7 @@ class Room {
     for (const b of this.birds.values()) {
       const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.input.fire ? 32 : 0) | (b.rebirth ? 64 : 0)
                   | (b.hiddenT > 0 ? 128 : 0) | (b.smallT > 0 ? 256 : 0) | (b.rageT > 0 ? 512 : 0) | (b.rapidT > 0 ? 1024 : 0);
-      birds.push([b.id, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.mode, flags, b.alive ? 1 : 0, r2(b.superCd), b.kills]);
+      birds.push([b.id, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.mode, flags, b.alive ? 1 : 0, r2(b.superCd), b.kills, r2(b.biteCd)]);
     }
     return { type: 'state', t: r2(this.time), birds, storm: this.stormSnapshot(), ev: this.events, alive: this.aliveBirds().length };
   }
@@ -894,7 +927,7 @@ function tryReconnect(client, token) {
       room.players.delete(p.id);
       p.id = client.id; p.ws = client.ws; room.players.set(p.id, p);
       b.playerId = client.id; client.room = room; client.bird = b;
-      if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq }; }
+      if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq, biteSeq: b.lastBiteSeq }; }
       send(client.ws, { type: 'welcome', id: client.id, token, balance: BALANCE, birdId: b.id, name: p.name, bird: p.bird, reconnected: true });
       send(client.ws, room.startMessage());
       return true;
@@ -926,7 +959,7 @@ function handleMessage(client, msg) {
       const i = b.input;
       i.mx = clamp(+msg.mx || 0, -1, 1); i.mz = clamp(+msg.mz || 0, -1, 1); i.vy = clamp(+msg.vy || 0, -1, 1);
       i.ax = clamp(+msg.ax || 0, -1, 1); i.az = clamp(+msg.az || 0, -1, 1);
-      i.fire = !!msg.fire; i.flySeq = msg.flySeq | 0; i.superSeq = msg.superSeq | 0;
+      i.fire = !!msg.fire; i.flySeq = msg.flySeq | 0; i.superSeq = msg.superSeq | 0; i.biteSeq = msg.biteSeq | 0;
       break;
     }
     case 'resume': {   // page reloaded mid-match: rejoin the same bird if it is still in play
