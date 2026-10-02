@@ -28,19 +28,19 @@ const DT = 1 / TICK_RATE;
    ============================================================================= */
 const BALANCE = {
   // Per-rarity stats. hp = max health, speed = ground speed, flySpeed = air speed,
-  // damage = per feather shot, fireRate = shots per second, superCooldown = seconds.
+  // damage = the bird's strike strength (bite damage = damage x BALANCE.bite.dmgMul), superCooldown = seconds.
   rarities: {
-    common:    { name: 'Common',     color: 0x9aa0a6, hp: 100, speed: 11.0, flySpeed: 18, damage: 12, fireRate: 5.0, superCooldown: 12 },
-    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 120, speed: 12.0, flySpeed: 20, damage: 14, fireRate: 5.5, superCooldown: 11 },
-    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, fireRate: 6.0, superCooldown: 14 },
-    epic:      { name: 'Epic',       color: 0xa855f7, hp: 165, speed: 13.0, flySpeed: 22, damage: 18, fireRate: 6.0, superCooldown: 13 },
-    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, fireRate: 6.5, superCooldown: 15 },
-    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 220, speed: 14.0, flySpeed: 24, damage: 24, fireRate: 7.0, superCooldown: 18 },
+    common:    { name: 'Common',     color: 0x9aa0a6, hp: 100, speed: 11.0, flySpeed: 18, damage: 12, superCooldown: 12 },
+    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 120, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 11 },
+    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, superCooldown: 14 },
+    epic:      { name: 'Epic',       color: 0xa855f7, hp: 165, speed: 13.0, flySpeed: 22, damage: 18, superCooldown: 13 },
+    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, superCooldown: 15 },
+    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 220, speed: 14.0, flySpeed: 24, damage: 24, superCooldown: 18 },
   },
   // The 26 birds. Stats come from the rarity above; each bird has its own body color and super ability.
   // `ability` keys map to cases in Room.useAbility(); tune their numbers in `abilities` below.
   birds: {
-    sparrow:    { n: 1,  name: 'Sparrow',          ru: 'Воробей',            rarity: 'common',    body: 0x8b6b4a, ability: 'quickPeck',      abilityName: 'Quick Peck',       abilityDesc: 'Double fire rate for 4s.' },
+    sparrow:    { n: 1,  name: 'Sparrow',          ru: 'Воробей',            rarity: 'common',    body: 0x8b6b4a, ability: 'quickPeck',      abilityName: 'Quick Peck',       abilityDesc: 'Double bite speed for 4s.' },
     pigeon:     { n: 2,  name: 'Pigeon',           ru: 'Голубь',             rarity: 'common',    body: 0x8d93a8, ability: 'invisibility',   abilityName: 'Invisibility',     abilityDesc: 'Vanish for 7s. Enemies and bots cannot see or target you.' },
     robin:      { n: 3,  name: 'Robin',            ru: 'Малиновка',          rarity: 'common',    body: 0xc9613b, ability: 'featherBurst',   abilityName: 'Feather Burst',    abilityDesc: 'Fires a wide spread of 7 feathers.' },
     starling:   { n: 4,  name: 'Starling',         ru: 'Скворец',            rarity: 'common',    body: 0x2f3b4a, ability: 'flockCall',      abilityName: 'Flock Call',       abilityDesc: 'Sends 4 homing feathers after the nearest enemy.' },
@@ -67,8 +67,9 @@ const BALANCE = {
     phoenix:    { n: 25, name: 'Phoenix',          ru: 'Феникс',             rarity: 'legendary', body: 0xff7a1a, ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth',  abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
     thunderbird:{ n: 26, name: 'Thunderbird',      ru: 'Птица грома',        rarity: 'legendary', body: 0x3a3a9a, ability: 'thunderstorm',   abilityName: 'Thunderstorm',     abilityDesc: '6 lightning bolts over 3s on random enemies within 45, 40 damage each.' },
   },
-  // Bite: every bird has it. Short range, single target, damage = the bird's rarity damage x dmgMul.
-  bite: { range: 4.6, coneDeg: 80, cooldown: 0.7, dmgMul: 2.2 },
+  // Bite: the one basic attack every bird has. Short range, single target, nearest enemy in front (a wide arc), damage = the
+  // bird's rarity damage x dmgMul. A flying bird biting a ground bird while diving (stoop) deals projectile.diveBonus x.
+  bite: { range: 4.6, coneDeg: 120, cooldown: 0.7, dmgMul: 2.2 },
   projectile: {
     speed: 70, ttl: 1.1,
     hitRadiusGround: 1.8,   // easier to hit birds on the ground
@@ -198,8 +199,7 @@ function moveBird(b, inp, dt, P) {
   }
   const d = Math.hypot(b.x, b.z);          // keep everyone on the map
   if (d > MAP.radius) { b.x *= MAP.radius / d; b.z *= MAP.radius / d; }
-  if (inp.fire && (inp.ax || inp.az)) b.yaw = Math.atan2(inp.ax, inp.az);
-  else if (len > 0.1) b.yaw = Math.atan2(mx, mz);
+  if (len > 0.1) b.yaw = Math.atan2(mx, mz);
 }
 
 /* =============================================================================
@@ -277,9 +277,9 @@ class Room {
       id: uid(), name: opts.name, bird: opts.bird, rarity: bird.rarity, ability: bird.ability, isBot: !!opts.isBot, playerId: opts.playerId || null, token: opts.token || null,
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, mode: 0,
       hp: st.hp, maxHp: st.hp, alive: true, kills: 0, placement: 0,
-      input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0, biteSeq: 0 },
+      input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, flySeq: 0, superSeq: 0, biteSeq: 0 },
       lastFlySeq: 0, lastSuperSeq: 0, lastBiteSeq: 0, biteCd: 0,
-      fireCd: 0, superCd: BALANCE.match.initialSuperCooldown,
+      superCd: BALANCE.match.initialSuperCooldown,
       shieldT: 0, invulnT: 0, speedT: 0, stunT: 0, dashT: 0, dashX: 0, dashZ: 0, dashHit: null,
       rebirth: false, reviveT: 0,
       hiddenT: 0, rapidT: 0, rageT: 0, smallT: 0, regenT: 0, regenRate: 0, dashY: 0, dashHeal: 0, thunder: null,
@@ -429,7 +429,7 @@ class Room {
     b.hiddenT = Math.max(0, b.hiddenT - dt); b.rapidT = Math.max(0, b.rapidT - dt); b.rageT = Math.max(0, b.rageT - dt); b.smallT = Math.max(0, b.smallT - dt);
     if (b.regenT > 0) { b.regenT -= dt; b.hp = Math.min(b.maxHp, b.hp + b.regenRate * dt); }
     if (b.thunder) this.updateThunder(b, dt);
-    b.fireCd -= dt; b.superCd = Math.max(0, b.superCd - dt); b.biteCd = Math.max(0, b.biteCd - dt);
+    b.superCd = Math.max(0, b.superCd - dt); b.biteCd = Math.max(0, b.biteCd - dt);
 
     // fly / land toggle (edge-triggered by a sequence number so no press is lost)
     if (inp.flySeq !== b.lastFlySeq) {
@@ -449,9 +449,6 @@ class Room {
       dashSpeed: b.dashSpeed || BALANCE.abilities.windDash.speed,
     });
     if (b.dashT > 0) this.dashContact(b); else b.dashY = 0;
-
-    // firing
-    if (inp.fire && b.fireCd <= 0 && b.stunT <= 0) { this.fire(b, null, 1); b.fireCd = 1 / (st.fireRate * (b.rapidT > 0 ? BALANCE.abilities.quickPeck.rateMul : 1)); }
 
     // super ability
     if (inp.superSeq !== b.lastSuperSeq) {
@@ -660,13 +657,16 @@ class Room {
       if (hd > 0.8 && (dx * fx + dz * fz) / hd < cone) continue;   // must be in front (very close birds always count)
       best = o; bd = d;
     }
-    b.biteCd = B.cooldown;
+    b.biteCd = B.cooldown / (b.rapidT > 0 ? BALANCE.abilities.quickPeck.rateMul : 1);   // Sparrow's Quick Peck
     const ev = { type: 'bite', b: b.id, x: r2(b.x), y: r2(b.y), z: r2(b.z), yaw: r2(b.yaw), hit: false };
     if (best) {
       b.yaw = Math.atan2(best.x - b.x, best.z - b.z);                // snap to face the victim
       ev.yaw = r2(b.yaw); ev.hit = true; ev.tx = r2(best.x); ev.ty = r2(best.y); ev.tz = r2(best.z);
       this.events.push(ev);
-      this.applyDamage(best, BALANCE.rarities[b.rarity].damage * B.dmgMul * (b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1), b, 'bite');
+      const dive = b.mode === 1 && best.mode === 0 && b.vy < -5;   // stooping onto a bird on the ground
+      let dmg = BALANCE.rarities[b.rarity].damage * B.dmgMul * (b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1);
+      if (dive) dmg *= BALANCE.projectile.diveBonus;
+      this.applyDamage(best, dmg, b, 'bite', false, { dive });
     } else this.events.push(ev);
   }
 
@@ -822,10 +822,9 @@ class Room {
       const a = Math.random() * Math.PI * 2, r = Math.random() * Math.max(0, zoneR - 15) * 0.6;
       goal = { x: zx + Math.cos(a) * r, z: zz + Math.sin(a) * r };
     }
-    if (!goal && target) {
-      const dx = b.x - target.x, dzz = b.z - target.z, d = Math.hypot(dx, dzz) || 1;
-      const want = 18, push = td > want + 4 ? -1 : td < want - 4 ? 1 : 0;      // approach / back off
-      goal = { x: b.x + (dx / d) * push * 10 + (-dzz / d) * ai.strafe * 8, z: b.z + (dzz / d) * push * 10 + (dx / d) * ai.strafe * 8 };
+    if (!goal && target) {   // melee: run at the target, weaving a little when close so bots don't just stand in a line
+      const dx = target.x - b.x, dzz = target.z - b.z, d = Math.hypot(dx, dzz) || 1, weave = td < 9 ? ai.strafe * 2.2 : 0;
+      goal = { x: target.x + (-dzz / d) * weave, z: target.z + (dx / d) * weave };
     }
     if (!goal) {
       ai.wanderT -= 0.2;
@@ -839,26 +838,23 @@ class Room {
     inp.mx = gx / gl; inp.mz = gz / gl;
     if (gl < 1.5) { inp.mx = 0; inp.mz = 0; }
 
-    // shooting (with a bit of aim error so bots aren't perfect)
-    if (target && td < 60) {
-      const ang = Math.atan2(target.x - b.x, target.z - b.z) + rand(-0.12, 0.12);
-      inp.ax = Math.sin(ang); inp.az = Math.cos(ang); inp.fire = true;
-    } else inp.fire = false;
+    // face the target for abilities that need a direction (dashes, homing feathers...)
+    if (target) { const ang = Math.atan2(target.x - b.x, target.z - b.z); inp.ax = Math.sin(ang); inp.az = Math.cos(ang); }
 
-    // flying decisions
+    // flying decisions: take off to reach a bird in the air, then match its height; dive onto ground birds
     if (b.mode === 0) {
-      const wantFly = (lowHp && target && Math.random() < 0.5) || (target && target.mode === 1 && Math.random() < 0.25) || (ai.flyT <= 0 && Math.random() < 0.3);
+      const wantFly = (lowHp && target && Math.random() < 0.4) || (target && target.mode === 1 && td < 40 && Math.random() < 0.35) || (!target && ai.flyT <= 0 && Math.random() < 0.3);
       if (wantFly) { inp.flySeq++; ai.flyT = rand(6, 14); }
     } else {
       const g = groundY(b.x, b.z);
-      let desired = g + (target ? rand(10, 18) : 14);
-      if (target && target.mode === 0 && td < 30 && b.y - target.y > 8 && Math.random() < 0.5) desired = target.y + 4; // dive-bomb
-      inp.vy = clamp((desired - b.y) * 0.25, -1, 1);
-      if (ai.flyT <= 0 && Math.random() < 0.35 && !target) { inp.flySeq++; ai.flyT = rand(6, 14); }
+      const desired = target ? (td > 30 ? g + 12 : target.y + 0.8) : g + 14;   // cruise high while far, then drop to the target's height
+      inp.vy = clamp((desired - b.y) * 0.3, -1, 1);
+      if (!target && ai.flyT <= 0 && Math.random() < 0.35) { inp.flySeq++; ai.flyT = rand(6, 14); }
+      else if (target && target.mode === 0 && td < 8 && b.y - groundY(b.x, b.z) < 2.6 && Math.random() < 0.3) { inp.flySeq++; ai.flyT = rand(4, 9); }   // low enough beside a ground bird: land and fight
     }
 
     // bite anything that gets close
-    if (target && td < BALANCE.bite.range - 0.4 && b.biteCd <= 0) inp.biteSeq++;
+    if (target && td < BALANCE.bite.range - 0.5 && b.biteCd <= 0) inp.biteSeq++;
 
     // super ability
     if (b.superCd <= 0) {
@@ -884,7 +880,7 @@ class Room {
   snapshot() {
     const birds = [];
     for (const b of this.birds.values()) {
-      const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.input.fire ? 32 : 0) | (b.rebirth ? 64 : 0)
+      const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.rebirth ? 64 : 0)
                   | (b.hiddenT > 0 ? 128 : 0) | (b.smallT > 0 ? 256 : 0) | (b.rageT > 0 ? 512 : 0) | (b.rapidT > 0 ? 1024 : 0);
       birds.push([b.id, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.mode, flags, b.alive ? 1 : 0, r2(b.superCd), b.kills, r2(b.biteCd)]);
     }
@@ -927,7 +923,7 @@ function tryReconnect(client, token) {
       room.players.delete(p.id);
       p.id = client.id; p.ws = client.ws; room.players.set(p.id, p);
       b.playerId = client.id; client.room = room; client.bird = b;
-      if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq, biteSeq: b.lastBiteSeq }; }
+      if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq, biteSeq: b.lastBiteSeq }; }
       send(client.ws, { type: 'welcome', id: client.id, token, balance: BALANCE, birdId: b.id, name: p.name, bird: p.bird, reconnected: true });
       send(client.ws, room.startMessage());
       return true;
@@ -959,7 +955,7 @@ function handleMessage(client, msg) {
       const i = b.input;
       i.mx = clamp(+msg.mx || 0, -1, 1); i.mz = clamp(+msg.mz || 0, -1, 1); i.vy = clamp(+msg.vy || 0, -1, 1);
       i.ax = clamp(+msg.ax || 0, -1, 1); i.az = clamp(+msg.az || 0, -1, 1);
-      i.fire = !!msg.fire; i.flySeq = msg.flySeq | 0; i.superSeq = msg.superSeq | 0; i.biteSeq = msg.biteSeq | 0;
+      i.flySeq = msg.flySeq | 0; i.superSeq = msg.superSeq | 0; i.biteSeq = msg.biteSeq | 0;
       break;
     }
     case 'resume': {   // page reloaded mid-match: rejoin the same bird if it is still in play

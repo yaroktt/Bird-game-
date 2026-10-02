@@ -77,13 +77,12 @@
   #joyMove { left: calc(24px + env(safe-area-inset-left)); bottom: 24px; width: 132px; height: 132px; }   /* resting spot; the stick actually appears under your thumb */
   #joyMove .knob { width: 58px; height: 58px; margin: -29px; }
   .joy.idle { opacity: .5; }
-  #joyAim { right: calc(28px + env(safe-area-inset-right)); bottom: 28px; border-color: rgba(255,120,120,.5); }
-  #joyAim .knob { background: rgba(255,140,140,.6); }
-  #joyAim .hint { position: absolute; left: 0; right: 0; top: -17px; text-align: center; font-size: 10px; font-weight: 800; opacity: .85; text-shadow: 0 1px 2px #000; }
-  #joyAim.cd { border-color: rgba(160,160,160,.4); }
+  #btnBite { right: calc(22px + env(safe-area-inset-right)); bottom: 22px; width: 108px; height: 108px; font-size: 18px; letter-spacing: 1px; background: radial-gradient(circle at 35% 35%, #ff9aa8, #d7263d 72%); box-shadow: 0 4px 14px rgba(0,0,0,.55); }
+  #btnBite:active { transform: scale(.94); }
+  #btnBite.cd { filter: grayscale(.75) brightness(.65); }
   .ctl { position: fixed; z-index: 14; border-radius: 50%; border: 0; color: #fff; font-weight: 800; font-size: 12px; text-shadow: 0 1px 2px #000; display: none; touch-action: none; }
   .ctl.show { display: flex; align-items: center; justify-content: center; }
-  #btnSuper { right: calc(165px + env(safe-area-inset-right)); bottom: 108px; width: 92px; height: 92px; background: radial-gradient(circle at 35% 35%, #fff1a8, #f77f00 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); flex-direction: column; }
+  #btnSuper { right: calc(146px + env(safe-area-inset-right)); bottom: 96px; width: 92px; height: 92px; background: radial-gradient(circle at 35% 35%, #fff1a8, #f77f00 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); flex-direction: column; }
   #btnSuper.cd { filter: grayscale(.8) brightness(.6); }
   #btnSuper svg { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); transform: rotate(-90deg); pointer-events: none; }
   #btnSuper .t { font-size: 10px; line-height: 1.1; }
@@ -118,7 +117,7 @@
 <!-- =============================================================== touch controls -->
 <div id="touch"></div>
 <div class="joy" id="joyMove"><div class="knob"></div></div>
-<div class="joy" id="joyAim"><span class="hint">TAP = BITE</span><div class="knob"></div></div>
+<button class="ctl" id="btnBite">BITE</button>
 <button class="ctl" id="btnSuper">
   <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="5"/><circle id="cdRing" cx="50" cy="50" r="47" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="295.3" stroke-dashoffset="0"/></svg>
   <span class="cdt" id="cdText">SUPER</span><span class="t" id="superName">Feather Burst</span>
@@ -162,7 +161,7 @@
     <div class="setRow"><span>Graphics</span><button class="btn secondary small" id="gfxBtn">High</button></div>
     <div class="setRow"><label for="sensRange">Camera speed</label><input type="range" id="sensRange" min="40" max="220" step="10" value="100" style="width:170px"></div>
     <div class="setRow"><span>Vibration</span><button class="btn secondary small" id="vibBtn">On</button></div>
-    <div id="help">Phone: left stick walks/flies. Swipe the empty screen: sideways to turn the camera, up to take off and climb, down to descend and land. Right stick: drag to aim &amp; auto-fire, tap it to bite.<br>Desktop: WASD move · Space fly/land · Q/E down/up · hold left mouse to shoot at cursor · right-drag or arrows to look · F = super · B = bite</div>
+    <div id="help">Phone: press the left side of the screen to walk/fly. Swipe the empty screen: sideways to turn the camera, up to take off and climb, down to descend and land. BITE button: bite (hold to keep biting). SUPER button: your special move.<br>Desktop: WASD move · Space fly/land · Q/E down/up · hold left mouse or press B to bite · right-drag or arrows to look · F = super · B = bite</div>
     <div class="row" style="margin-top:10px"><button class="btn" id="settingsBack">Back</button></div>
   </div>
 </div>
@@ -204,19 +203,19 @@ const LocalServer = (function () {
   const DT = 1 / TICK_RATE;
 const BALANCE = {
   // Per-rarity stats. hp = max health, speed = ground speed, flySpeed = air speed,
-  // damage = per feather shot, fireRate = shots per second, superCooldown = seconds.
+  // damage = the bird's strike strength (bite damage = damage x BALANCE.bite.dmgMul), superCooldown = seconds.
   rarities: {
-    common:    { name: 'Common',     color: 0x9aa0a6, hp: 100, speed: 11.0, flySpeed: 18, damage: 12, fireRate: 5.0, superCooldown: 12 },
-    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 120, speed: 12.0, flySpeed: 20, damage: 14, fireRate: 5.5, superCooldown: 11 },
-    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, fireRate: 6.0, superCooldown: 14 },
-    epic:      { name: 'Epic',       color: 0xa855f7, hp: 165, speed: 13.0, flySpeed: 22, damage: 18, fireRate: 6.0, superCooldown: 13 },
-    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, fireRate: 6.5, superCooldown: 15 },
-    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 220, speed: 14.0, flySpeed: 24, damage: 24, fireRate: 7.0, superCooldown: 18 },
+    common:    { name: 'Common',     color: 0x9aa0a6, hp: 100, speed: 11.0, flySpeed: 18, damage: 12, superCooldown: 12 },
+    rare:      { name: 'Rare',       color: 0x3b82f6, hp: 120, speed: 12.0, flySpeed: 20, damage: 14, superCooldown: 11 },
+    superRare: { name: 'Super Rare', color: 0x22c55e, hp: 140, speed: 12.5, flySpeed: 21, damage: 16, superCooldown: 14 },
+    epic:      { name: 'Epic',       color: 0xa855f7, hp: 165, speed: 13.0, flySpeed: 22, damage: 18, superCooldown: 13 },
+    mythic:    { name: 'Mythic',     color: 0xef4444, hp: 190, speed: 13.5, flySpeed: 23, damage: 21, superCooldown: 15 },
+    legendary: { name: 'Legendary',  color: 0xf59e0b, hp: 220, speed: 14.0, flySpeed: 24, damage: 24, superCooldown: 18 },
   },
   // The 26 birds. Stats come from the rarity above; each bird has its own body color and super ability.
   // `ability` keys map to cases in Room.useAbility(); tune their numbers in `abilities` below.
   birds: {
-    sparrow:    { n: 1,  name: 'Sparrow',          ru: 'Воробей',            rarity: 'common',    body: 0x8b6b4a, ability: 'quickPeck',      abilityName: 'Quick Peck',       abilityDesc: 'Double fire rate for 4s.' },
+    sparrow:    { n: 1,  name: 'Sparrow',          ru: 'Воробей',            rarity: 'common',    body: 0x8b6b4a, ability: 'quickPeck',      abilityName: 'Quick Peck',       abilityDesc: 'Double bite speed for 4s.' },
     pigeon:     { n: 2,  name: 'Pigeon',           ru: 'Голубь',             rarity: 'common',    body: 0x8d93a8, ability: 'invisibility',   abilityName: 'Invisibility',     abilityDesc: 'Vanish for 7s. Enemies and bots cannot see or target you.' },
     robin:      { n: 3,  name: 'Robin',            ru: 'Малиновка',          rarity: 'common',    body: 0xc9613b, ability: 'featherBurst',   abilityName: 'Feather Burst',    abilityDesc: 'Fires a wide spread of 7 feathers.' },
     starling:   { n: 4,  name: 'Starling',         ru: 'Скворец',            rarity: 'common',    body: 0x2f3b4a, ability: 'flockCall',      abilityName: 'Flock Call',       abilityDesc: 'Sends 4 homing feathers after the nearest enemy.' },
@@ -243,8 +242,9 @@ const BALANCE = {
     phoenix:    { n: 25, name: 'Phoenix',          ru: 'Феникс',             rarity: 'legendary', body: 0xff7a1a, ability: 'phoenixRebirth', abilityName: 'Phoenix Rebirth',  abilityDesc: 'Huge fire explosion. If you are knocked out afterwards you revive once at half health.' },
     thunderbird:{ n: 26, name: 'Thunderbird',      ru: 'Птица грома',        rarity: 'legendary', body: 0x3a3a9a, ability: 'thunderstorm',   abilityName: 'Thunderstorm',     abilityDesc: '6 lightning bolts over 3s on random enemies within 45, 40 damage each.' },
   },
-  // Bite: every bird has it. Short range, single target, damage = the bird's rarity damage x dmgMul.
-  bite: { range: 4.6, coneDeg: 80, cooldown: 0.7, dmgMul: 2.2 },
+  // Bite: the one basic attack every bird has. Short range, single target, nearest enemy in front (a wide arc), damage = the
+  // bird's rarity damage x dmgMul. A flying bird biting a ground bird while diving (stoop) deals projectile.diveBonus x.
+  bite: { range: 4.6, coneDeg: 120, cooldown: 0.7, dmgMul: 2.2 },
   projectile: {
     speed: 70, ttl: 1.1,
     hitRadiusGround: 1.8,   // easier to hit birds on the ground
@@ -374,8 +374,7 @@ function moveBird(b, inp, dt, P) {
   }
   const d = Math.hypot(b.x, b.z);          // keep everyone on the map
   if (d > MAP.radius) { b.x *= MAP.radius / d; b.z *= MAP.radius / d; }
-  if (inp.fire && (inp.ax || inp.az)) b.yaw = Math.atan2(inp.ax, inp.az);
-  else if (len > 0.1) b.yaw = Math.atan2(mx, mz);
+  if (len > 0.1) b.yaw = Math.atan2(mx, mz);
 }
 
 /* =============================================================================
@@ -453,9 +452,9 @@ class Room {
       id: uid(), name: opts.name, bird: opts.bird, rarity: bird.rarity, ability: bird.ability, isBot: !!opts.isBot, playerId: opts.playerId || null, token: opts.token || null,
       x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, yaw: 0, mode: 0,
       hp: st.hp, maxHp: st.hp, alive: true, kills: 0, placement: 0,
-      input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0, biteSeq: 0 },
+      input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, flySeq: 0, superSeq: 0, biteSeq: 0 },
       lastFlySeq: 0, lastSuperSeq: 0, lastBiteSeq: 0, biteCd: 0,
-      fireCd: 0, superCd: BALANCE.match.initialSuperCooldown,
+      superCd: BALANCE.match.initialSuperCooldown,
       shieldT: 0, invulnT: 0, speedT: 0, stunT: 0, dashT: 0, dashX: 0, dashZ: 0, dashHit: null,
       rebirth: false, reviveT: 0,
       hiddenT: 0, rapidT: 0, rageT: 0, smallT: 0, regenT: 0, regenRate: 0, dashY: 0, dashHeal: 0, thunder: null,
@@ -605,7 +604,7 @@ class Room {
     b.hiddenT = Math.max(0, b.hiddenT - dt); b.rapidT = Math.max(0, b.rapidT - dt); b.rageT = Math.max(0, b.rageT - dt); b.smallT = Math.max(0, b.smallT - dt);
     if (b.regenT > 0) { b.regenT -= dt; b.hp = Math.min(b.maxHp, b.hp + b.regenRate * dt); }
     if (b.thunder) this.updateThunder(b, dt);
-    b.fireCd -= dt; b.superCd = Math.max(0, b.superCd - dt); b.biteCd = Math.max(0, b.biteCd - dt);
+    b.superCd = Math.max(0, b.superCd - dt); b.biteCd = Math.max(0, b.biteCd - dt);
 
     // fly / land toggle (edge-triggered by a sequence number so no press is lost)
     if (inp.flySeq !== b.lastFlySeq) {
@@ -625,9 +624,6 @@ class Room {
       dashSpeed: b.dashSpeed || BALANCE.abilities.windDash.speed,
     });
     if (b.dashT > 0) this.dashContact(b); else b.dashY = 0;
-
-    // firing
-    if (inp.fire && b.fireCd <= 0 && b.stunT <= 0) { this.fire(b, null, 1); b.fireCd = 1 / (st.fireRate * (b.rapidT > 0 ? BALANCE.abilities.quickPeck.rateMul : 1)); }
 
     // super ability
     if (inp.superSeq !== b.lastSuperSeq) {
@@ -836,13 +832,16 @@ class Room {
       if (hd > 0.8 && (dx * fx + dz * fz) / hd < cone) continue;   // must be in front (very close birds always count)
       best = o; bd = d;
     }
-    b.biteCd = B.cooldown;
+    b.biteCd = B.cooldown / (b.rapidT > 0 ? BALANCE.abilities.quickPeck.rateMul : 1);   // Sparrow's Quick Peck
     const ev = { type: 'bite', b: b.id, x: r2(b.x), y: r2(b.y), z: r2(b.z), yaw: r2(b.yaw), hit: false };
     if (best) {
       b.yaw = Math.atan2(best.x - b.x, best.z - b.z);                // snap to face the victim
       ev.yaw = r2(b.yaw); ev.hit = true; ev.tx = r2(best.x); ev.ty = r2(best.y); ev.tz = r2(best.z);
       this.events.push(ev);
-      this.applyDamage(best, BALANCE.rarities[b.rarity].damage * B.dmgMul * (b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1), b, 'bite');
+      const dive = b.mode === 1 && best.mode === 0 && b.vy < -5;   // stooping onto a bird on the ground
+      let dmg = BALANCE.rarities[b.rarity].damage * B.dmgMul * (b.rageT > 0 ? BALANCE.abilities.crimsonRage.dmgMul : 1);
+      if (dive) dmg *= BALANCE.projectile.diveBonus;
+      this.applyDamage(best, dmg, b, 'bite', false, { dive });
     } else this.events.push(ev);
   }
 
@@ -998,10 +997,9 @@ class Room {
       const a = Math.random() * Math.PI * 2, r = Math.random() * Math.max(0, zoneR - 15) * 0.6;
       goal = { x: zx + Math.cos(a) * r, z: zz + Math.sin(a) * r };
     }
-    if (!goal && target) {
-      const dx = b.x - target.x, dzz = b.z - target.z, d = Math.hypot(dx, dzz) || 1;
-      const want = 18, push = td > want + 4 ? -1 : td < want - 4 ? 1 : 0;      // approach / back off
-      goal = { x: b.x + (dx / d) * push * 10 + (-dzz / d) * ai.strafe * 8, z: b.z + (dzz / d) * push * 10 + (dx / d) * ai.strafe * 8 };
+    if (!goal && target) {   // melee: run at the target, weaving a little when close so bots don't just stand in a line
+      const dx = target.x - b.x, dzz = target.z - b.z, d = Math.hypot(dx, dzz) || 1, weave = td < 9 ? ai.strafe * 2.2 : 0;
+      goal = { x: target.x + (-dzz / d) * weave, z: target.z + (dx / d) * weave };
     }
     if (!goal) {
       ai.wanderT -= 0.2;
@@ -1015,26 +1013,23 @@ class Room {
     inp.mx = gx / gl; inp.mz = gz / gl;
     if (gl < 1.5) { inp.mx = 0; inp.mz = 0; }
 
-    // shooting (with a bit of aim error so bots aren't perfect)
-    if (target && td < 60) {
-      const ang = Math.atan2(target.x - b.x, target.z - b.z) + rand(-0.12, 0.12);
-      inp.ax = Math.sin(ang); inp.az = Math.cos(ang); inp.fire = true;
-    } else inp.fire = false;
+    // face the target for abilities that need a direction (dashes, homing feathers...)
+    if (target) { const ang = Math.atan2(target.x - b.x, target.z - b.z); inp.ax = Math.sin(ang); inp.az = Math.cos(ang); }
 
-    // flying decisions
+    // flying decisions: take off to reach a bird in the air, then match its height; dive onto ground birds
     if (b.mode === 0) {
-      const wantFly = (lowHp && target && Math.random() < 0.5) || (target && target.mode === 1 && Math.random() < 0.25) || (ai.flyT <= 0 && Math.random() < 0.3);
+      const wantFly = (lowHp && target && Math.random() < 0.4) || (target && target.mode === 1 && td < 40 && Math.random() < 0.35) || (!target && ai.flyT <= 0 && Math.random() < 0.3);
       if (wantFly) { inp.flySeq++; ai.flyT = rand(6, 14); }
     } else {
       const g = groundY(b.x, b.z);
-      let desired = g + (target ? rand(10, 18) : 14);
-      if (target && target.mode === 0 && td < 30 && b.y - target.y > 8 && Math.random() < 0.5) desired = target.y + 4; // dive-bomb
-      inp.vy = clamp((desired - b.y) * 0.25, -1, 1);
-      if (ai.flyT <= 0 && Math.random() < 0.35 && !target) { inp.flySeq++; ai.flyT = rand(6, 14); }
+      const desired = target ? (td > 30 ? g + 12 : target.y + 0.8) : g + 14;   // cruise high while far, then drop to the target's height
+      inp.vy = clamp((desired - b.y) * 0.3, -1, 1);
+      if (!target && ai.flyT <= 0 && Math.random() < 0.35) { inp.flySeq++; ai.flyT = rand(6, 14); }
+      else if (target && target.mode === 0 && td < 8 && b.y - groundY(b.x, b.z) < 2.6 && Math.random() < 0.3) { inp.flySeq++; ai.flyT = rand(4, 9); }   // low enough beside a ground bird: land and fight
     }
 
     // bite anything that gets close
-    if (target && td < BALANCE.bite.range - 0.4 && b.biteCd <= 0) inp.biteSeq++;
+    if (target && td < BALANCE.bite.range - 0.5 && b.biteCd <= 0) inp.biteSeq++;
 
     // super ability
     if (b.superCd <= 0) {
@@ -1060,7 +1055,7 @@ class Room {
   snapshot() {
     const birds = [];
     for (const b of this.birds.values()) {
-      const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.input.fire ? 32 : 0) | (b.rebirth ? 64 : 0)
+      const flags = (b.shieldT > 0 ? 1 : 0) | (b.invulnT > 0 ? 2 : 0) | (b.speedT > 0 ? 4 : 0) | (b.dashT > 0 ? 8 : 0) | (b.stunT > 0 ? 16 : 0) | (b.rebirth ? 64 : 0)
                   | (b.hiddenT > 0 ? 128 : 0) | (b.smallT > 0 ? 256 : 0) | (b.rageT > 0 ? 512 : 0) | (b.rapidT > 0 ? 1024 : 0);
       birds.push([b.id, r2(b.x), r2(b.y), r2(b.z), r2(b.yaw), Math.round(b.hp), b.mode, flags, b.alive ? 1 : 0, r2(b.superCd), b.kills, r2(b.biteCd)]);
     }
@@ -1103,7 +1098,7 @@ function tryReconnect(client, token) {
       room.players.delete(p.id);
       p.id = client.id; p.ws = client.ws; room.players.set(p.id, p);
       b.playerId = client.id; client.room = room; client.bird = b;
-      if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq, biteSeq: b.lastBiteSeq }; }
+      if (b.alive && b.isBot) { b.isBot = false; b.ai = null; b.input = { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, flySeq: b.lastFlySeq, superSeq: b.lastSuperSeq, biteSeq: b.lastBiteSeq }; }
       send(client.ws, { type: 'welcome', id: client.id, token, balance: BALANCE, birdId: b.id, name: p.name, bird: p.bird, reconnected: true });
       send(client.ws, room.startMessage());
       return true;
@@ -1135,7 +1130,7 @@ function handleMessage(client, msg) {
       const i = b.input;
       i.mx = clamp(+msg.mx || 0, -1, 1); i.mz = clamp(+msg.mz || 0, -1, 1); i.vy = clamp(+msg.vy || 0, -1, 1);
       i.ax = clamp(+msg.ax || 0, -1, 1); i.az = clamp(+msg.az || 0, -1, 1);
-      i.fire = !!msg.fire; i.flySeq = msg.flySeq | 0; i.superSeq = msg.superSeq | 0; i.biteSeq = msg.biteSeq | 0;
+      i.flySeq = msg.flySeq | 0; i.superSeq = msg.superSeq | 0; i.biteSeq = msg.biteSeq | 0;
       break;
     }
     case 'resume': {   // page reloaded mid-match: rejoin the same bird if it is still in play
@@ -1241,8 +1236,7 @@ function moveBird(b, inp, dt, P) {
   }
   const d = Math.hypot(b.x, b.z);
   if (d > MAP.radius) { b.x *= MAP.radius / d; b.z *= MAP.radius / d; }
-  if (inp.fire && (inp.ax || inp.az)) b.yaw = Math.atan2(inp.ax, inp.az);
-  else if (len > 0.1) b.yaw = Math.atan2(mx, mz);
+  if (len > 0.1) b.yaw = Math.atan2(mx, mz);
 }
 
 /* =============================================================================
@@ -1258,7 +1252,7 @@ const RARITY_ORDER = ['common', 'rare', 'superRare', 'epic', 'mythic', 'legendar
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 // Copy of the server's balance table so the menus render before the server answers (replaced on 'welcome').
 // The block between the markers is written by `node build.js` from server.js - do not edit it by hand.
-let BALANCE = /*BALANCE_START*/{"rarities":{"common":{"name":"Common","color":10133670,"hp":100,"speed":11,"flySpeed":18,"damage":12,"fireRate":5,"superCooldown":12},"rare":{"name":"Rare","color":3900150,"hp":120,"speed":12,"flySpeed":20,"damage":14,"fireRate":5.5,"superCooldown":11},"superRare":{"name":"Super Rare","color":2278750,"hp":140,"speed":12.5,"flySpeed":21,"damage":16,"fireRate":6,"superCooldown":14},"epic":{"name":"Epic","color":11032055,"hp":165,"speed":13,"flySpeed":22,"damage":18,"fireRate":6,"superCooldown":13},"mythic":{"name":"Mythic","color":15680580,"hp":190,"speed":13.5,"flySpeed":23,"damage":21,"fireRate":6.5,"superCooldown":15},"legendary":{"name":"Legendary","color":16096779,"hp":220,"speed":14,"flySpeed":24,"damage":24,"fireRate":7,"superCooldown":18}},"birds":{"sparrow":{"n":1,"name":"Sparrow","ru":"Воробей","rarity":"common","body":9136970,"ability":"quickPeck","abilityName":"Quick Peck","abilityDesc":"Double fire rate for 4s."},"pigeon":{"n":2,"name":"Pigeon","ru":"Голубь","rarity":"common","body":9278376,"ability":"invisibility","abilityName":"Invisibility","abilityDesc":"Vanish for 7s. Enemies and bots cannot see or target you."},"robin":{"n":3,"name":"Robin","ru":"Малиновка","rarity":"common","body":13197627,"ability":"featherBurst","abilityName":"Feather Burst","abilityDesc":"Fires a wide spread of 7 feathers."},"starling":{"n":4,"name":"Starling","ru":"Скворец","rarity":"common","body":3095370,"ability":"flockCall","abilityName":"Flock Call","abilityDesc":"Sends 4 homing feathers after the nearest enemy."},"wren":{"n":5,"name":"Wren","ru":"Крапивник","rarity":"common","body":10254933,"ability":"tinyTarget","abilityName":"Tiny Target","abilityDesc":"Shrink for 6s: half as easy to hit and 25% faster."},"finch":{"n":6,"name":"Finch","ru":"Зяблик","rarity":"common","body":14257247,"ability":"seedSnack","abilityName":"Seed Snack","abilityDesc":"Instantly heal 40 HP."},"blueJay":{"n":7,"name":"Blue Jay","ru":"Голубая сойка","rarity":"rare","body":3900150,"ability":"screech","abilityName":"Mimic Screech","abilityDesc":"Every enemy within 16 is slowed for 2s."},"cardinal":{"n":8,"name":"Cardinal","ru":"Кардинал","rarity":"rare","body":14100029,"ability":"crimsonRage","abilityName":"Crimson Rage","abilityDesc":"+60% damage for 5s."},"kingfisher":{"n":9,"name":"Kingfisher","ru":"Зимородок","rarity":"rare","body":2072025,"ability":"windDash","abilityName":"Dive Strike","abilityDesc":"Blast forward at high speed, hurting anyone you pass."},"magpie":{"n":10,"name":"Magpie","ru":"Сорока","rarity":"rare","body":1973802,"ability":"stealShine","abilityName":"Steal Shine","abilityDesc":"Take 30 HP from the nearest enemy within 22 and keep it."},"woodpecker":{"n":11,"name":"Woodpecker","ru":"Дятел","rarity":"rare","body":11546672,"ability":"drillShot","abilityName":"Drill Shot","abilityDesc":"One heavy feather (45 dmg) that pierces through every bird in its path."},"barnOwl":{"n":12,"name":"Barn Owl","ru":"Сипуха","rarity":"superRare","body":15259832,"ability":"hush","abilityName":"Hush","abilityDesc":"Enemies within 22 are slowed 2s and their super is delayed by 6s."},"raven":{"n":13,"name":"Raven","ru":"Ворон","rarity":"superRare","body":1381661,"ability":"shadowShield","abilityName":"Shadow Shield","abilityDesc":"Become invulnerable for 4s and reflect all damage back."},"toucan":{"n":14,"name":"Toucan","ru":"Тукан","rarity":"superRare","body":1710618,"ability":"fruitBomb","abilityName":"Fruit Bomb","abilityDesc":"Lob a fruit that explodes for 55 damage in a radius of 8."},"flamingo":{"n":15,"name":"Flamingo","ru":"Фламинго","rarity":"superRare","body":15760040,"ability":"healingNest","abilityName":"Healing Nest","abilityDesc":"Drops a nest that heals every bird inside it for 5s."},"macaw":{"n":16,"name":"Macaw","ru":"Ара","rarity":"superRare","body":15087942,"ability":"rainbowRing","abilityName":"Rainbow Ring","abilityDesc":"Fires 12 feathers in every direction at once."},"peregrine":{"n":17,"name":"Peregrine Falcon","ru":"Сапсан","rarity":"epic","body":4872811,"ability":"stoop","abilityName":"Stoop","abilityDesc":"The fastest dive in nature: rocket forward and down, 60 damage on contact."},"snowyOwl":{"n":18,"name":"Snowy Owl","ru":"Белая сова","rarity":"epic","body":15921906,"ability":"frostTalons","abilityName":"Frost Talons","abilityDesc":"Freeze the nearest enemy within 40: 40 damage and a 3s slow."},"hornbill":{"n":19,"name":"Hornbill","ru":"Птица-носорог","rarity":"epic","body":2236962,"ability":"casqueBash","abilityName":"Casque Bash","abilityDesc":"Charge forward; each bird you hit takes 40 and heals you 20."},"osprey":{"n":20,"name":"Osprey","ru":"Скопа","rarity":"epic","body":7035464,"ability":"fishHook","abilityName":"Fish Hook","abilityDesc":"Yank the nearest enemy within 35 to your side and deal 35."},"goldenEagle":{"n":21,"name":"Golden Eagle","ru":"Беркут","rarity":"epic","body":9067043,"ability":"stormTalons","abilityName":"Storm Talons","abilityDesc":"Calls lightning down on the nearest enemy, damaging and slowing it."},"baldEagle":{"n":22,"name":"Bald Eagle","ru":"Белоголовый орлан","rarity":"mythic","body":4864038,"ability":"freedomStrike","abilityName":"Freedom Strike","abilityDesc":"Lightning hits every enemy within 30 for 45."},"condor":{"n":23,"name":"Andean Condor","ru":"Андский кондор","rarity":"mythic","body":2763306,"ability":"thermalRise","abilityName":"Thermal Rise","abilityDesc":"Untouchable for 2s, then regenerate 70 HP over 5s with a speed boost."},"harpy":{"n":24,"name":"Harpy Eagle","ru":"Гарпия","rarity":"mythic","body":6978186,"ability":"crushingGrip","abilityName":"Crushing Grip","abilityDesc":"Seize the nearest enemy within 25: 95 damage and a 2.5s slow."},"phoenix":{"n":25,"name":"Phoenix","ru":"Феникс","rarity":"legendary","body":16742938,"ability":"phoenixRebirth","abilityName":"Phoenix Rebirth","abilityDesc":"Huge fire explosion. If you are knocked out afterwards you revive once at half health."},"thunderbird":{"n":26,"name":"Thunderbird","ru":"Птица грома","rarity":"legendary","body":3816090,"ability":"thunderstorm","abilityName":"Thunderstorm","abilityDesc":"6 lightning bolts over 3s on random enemies within 45, 40 damage each."}},"bite":{"range":4.6,"coneDeg":80,"cooldown":0.7,"dmgMul":2.2},"projectile":{"speed":70,"ttl":1.1,"hitRadiusGround":1.8,"hitRadiusFlying":1.15,"diveBonus":1.5,"diveHeight":6},"abilities":{"quickPeck":{"duration":4,"rateMul":2},"invisibility":{"duration":7},"featherBurst":{"count":7,"spreadDeg":70,"dmgMul":0.9},"flockCall":{"count":4,"dmgMul":0.8,"turnRate":6},"tinyTarget":{"duration":6,"speedMul":1.25,"radiusMul":0.5},"seedSnack":{"heal":40},"screech":{"radius":16,"slow":2},"crimsonRage":{"duration":5,"dmgMul":1.6},"windDash":{"speed":110,"duration":0.35,"contactDamage":22},"stealShine":{"range":22,"amount":30},"drillShot":{"damage":45},"hush":{"radius":22,"slow":2,"silence":6},"shadowShield":{"duration":4,"reflect":1},"fruitBomb":{"damage":55,"radius":8,"speed":32,"lob":18},"healingNest":{"radius":9,"duration":5,"healPerSec":16},"rainbowRing":{"count":12,"dmgMul":0.8},"stoop":{"speed":120,"duration":0.5,"contactDamage":60,"dive":55},"frostTalons":{"range":40,"damage":40,"slow":3},"casqueBash":{"speed":90,"duration":0.45,"contactDamage":40,"heal":20},"fishHook":{"range":35,"damage":35},"stormTalons":{"range":45,"damage":65,"slowDuration":1.2},"freedomStrike":{"radius":30,"damage":45,"slow":1},"thermalRise":{"invuln":2,"regen":70,"regenTime":5,"speedTime":6},"crushingGrip":{"range":25,"damage":95,"slow":2.5},"phoenixRebirth":{"radius":15,"damage":85,"reviveHp":0.5,"reviveDelay":1.5},"thunderstorm":{"radius":45,"bolts":6,"duration":3,"damage":40,"slow":0.8}},"pickups":{"count":44,"chests":8,"health":40,"bigHealth":100,"speedMul":1.6,"speedDuration":8,"shieldDuration":5,"bigShieldDuration":9,"pickRadius":2.4,"chestRadius":3.2},"storm":{"phases":[{"delay":30,"shrink":20,"radius":200},{"delay":20,"shrink":20,"radius":135},{"delay":20,"shrink":15,"radius":85},{"delay":15,"shrink":15,"radius":45},{"delay":15,"shrink":15,"radius":15},{"delay":10,"shrink":20,"radius":0}],"damageBase":4,"damagePerPhase":3},"match":{"maxPlayers":10,"lobbyCountdown":20,"spawnHeight":140,"fallSpeed":26,"climbSpeed":12,"maxAltitude":110,"initialSuperCooldown":6,"endScreenSeconds":30}}/*BALANCE_END*/;
+let BALANCE = /*BALANCE_START*/{"rarities":{"common":{"name":"Common","color":10133670,"hp":100,"speed":11,"flySpeed":18,"damage":12,"superCooldown":12},"rare":{"name":"Rare","color":3900150,"hp":120,"speed":12,"flySpeed":20,"damage":14,"superCooldown":11},"superRare":{"name":"Super Rare","color":2278750,"hp":140,"speed":12.5,"flySpeed":21,"damage":16,"superCooldown":14},"epic":{"name":"Epic","color":11032055,"hp":165,"speed":13,"flySpeed":22,"damage":18,"superCooldown":13},"mythic":{"name":"Mythic","color":15680580,"hp":190,"speed":13.5,"flySpeed":23,"damage":21,"superCooldown":15},"legendary":{"name":"Legendary","color":16096779,"hp":220,"speed":14,"flySpeed":24,"damage":24,"superCooldown":18}},"birds":{"sparrow":{"n":1,"name":"Sparrow","ru":"Воробей","rarity":"common","body":9136970,"ability":"quickPeck","abilityName":"Quick Peck","abilityDesc":"Double bite speed for 4s."},"pigeon":{"n":2,"name":"Pigeon","ru":"Голубь","rarity":"common","body":9278376,"ability":"invisibility","abilityName":"Invisibility","abilityDesc":"Vanish for 7s. Enemies and bots cannot see or target you."},"robin":{"n":3,"name":"Robin","ru":"Малиновка","rarity":"common","body":13197627,"ability":"featherBurst","abilityName":"Feather Burst","abilityDesc":"Fires a wide spread of 7 feathers."},"starling":{"n":4,"name":"Starling","ru":"Скворец","rarity":"common","body":3095370,"ability":"flockCall","abilityName":"Flock Call","abilityDesc":"Sends 4 homing feathers after the nearest enemy."},"wren":{"n":5,"name":"Wren","ru":"Крапивник","rarity":"common","body":10254933,"ability":"tinyTarget","abilityName":"Tiny Target","abilityDesc":"Shrink for 6s: half as easy to hit and 25% faster."},"finch":{"n":6,"name":"Finch","ru":"Зяблик","rarity":"common","body":14257247,"ability":"seedSnack","abilityName":"Seed Snack","abilityDesc":"Instantly heal 40 HP."},"blueJay":{"n":7,"name":"Blue Jay","ru":"Голубая сойка","rarity":"rare","body":3900150,"ability":"screech","abilityName":"Mimic Screech","abilityDesc":"Every enemy within 16 is slowed for 2s."},"cardinal":{"n":8,"name":"Cardinal","ru":"Кардинал","rarity":"rare","body":14100029,"ability":"crimsonRage","abilityName":"Crimson Rage","abilityDesc":"+60% damage for 5s."},"kingfisher":{"n":9,"name":"Kingfisher","ru":"Зимородок","rarity":"rare","body":2072025,"ability":"windDash","abilityName":"Dive Strike","abilityDesc":"Blast forward at high speed, hurting anyone you pass."},"magpie":{"n":10,"name":"Magpie","ru":"Сорока","rarity":"rare","body":1973802,"ability":"stealShine","abilityName":"Steal Shine","abilityDesc":"Take 30 HP from the nearest enemy within 22 and keep it."},"woodpecker":{"n":11,"name":"Woodpecker","ru":"Дятел","rarity":"rare","body":11546672,"ability":"drillShot","abilityName":"Drill Shot","abilityDesc":"One heavy feather (45 dmg) that pierces through every bird in its path."},"barnOwl":{"n":12,"name":"Barn Owl","ru":"Сипуха","rarity":"superRare","body":15259832,"ability":"hush","abilityName":"Hush","abilityDesc":"Enemies within 22 are slowed 2s and their super is delayed by 6s."},"raven":{"n":13,"name":"Raven","ru":"Ворон","rarity":"superRare","body":1381661,"ability":"shadowShield","abilityName":"Shadow Shield","abilityDesc":"Become invulnerable for 4s and reflect all damage back."},"toucan":{"n":14,"name":"Toucan","ru":"Тукан","rarity":"superRare","body":1710618,"ability":"fruitBomb","abilityName":"Fruit Bomb","abilityDesc":"Lob a fruit that explodes for 55 damage in a radius of 8."},"flamingo":{"n":15,"name":"Flamingo","ru":"Фламинго","rarity":"superRare","body":15760040,"ability":"healingNest","abilityName":"Healing Nest","abilityDesc":"Drops a nest that heals every bird inside it for 5s."},"macaw":{"n":16,"name":"Macaw","ru":"Ара","rarity":"superRare","body":15087942,"ability":"rainbowRing","abilityName":"Rainbow Ring","abilityDesc":"Fires 12 feathers in every direction at once."},"peregrine":{"n":17,"name":"Peregrine Falcon","ru":"Сапсан","rarity":"epic","body":4872811,"ability":"stoop","abilityName":"Stoop","abilityDesc":"The fastest dive in nature: rocket forward and down, 60 damage on contact."},"snowyOwl":{"n":18,"name":"Snowy Owl","ru":"Белая сова","rarity":"epic","body":15921906,"ability":"frostTalons","abilityName":"Frost Talons","abilityDesc":"Freeze the nearest enemy within 40: 40 damage and a 3s slow."},"hornbill":{"n":19,"name":"Hornbill","ru":"Птица-носорог","rarity":"epic","body":2236962,"ability":"casqueBash","abilityName":"Casque Bash","abilityDesc":"Charge forward; each bird you hit takes 40 and heals you 20."},"osprey":{"n":20,"name":"Osprey","ru":"Скопа","rarity":"epic","body":7035464,"ability":"fishHook","abilityName":"Fish Hook","abilityDesc":"Yank the nearest enemy within 35 to your side and deal 35."},"goldenEagle":{"n":21,"name":"Golden Eagle","ru":"Беркут","rarity":"epic","body":9067043,"ability":"stormTalons","abilityName":"Storm Talons","abilityDesc":"Calls lightning down on the nearest enemy, damaging and slowing it."},"baldEagle":{"n":22,"name":"Bald Eagle","ru":"Белоголовый орлан","rarity":"mythic","body":4864038,"ability":"freedomStrike","abilityName":"Freedom Strike","abilityDesc":"Lightning hits every enemy within 30 for 45."},"condor":{"n":23,"name":"Andean Condor","ru":"Андский кондор","rarity":"mythic","body":2763306,"ability":"thermalRise","abilityName":"Thermal Rise","abilityDesc":"Untouchable for 2s, then regenerate 70 HP over 5s with a speed boost."},"harpy":{"n":24,"name":"Harpy Eagle","ru":"Гарпия","rarity":"mythic","body":6978186,"ability":"crushingGrip","abilityName":"Crushing Grip","abilityDesc":"Seize the nearest enemy within 25: 95 damage and a 2.5s slow."},"phoenix":{"n":25,"name":"Phoenix","ru":"Феникс","rarity":"legendary","body":16742938,"ability":"phoenixRebirth","abilityName":"Phoenix Rebirth","abilityDesc":"Huge fire explosion. If you are knocked out afterwards you revive once at half health."},"thunderbird":{"n":26,"name":"Thunderbird","ru":"Птица грома","rarity":"legendary","body":3816090,"ability":"thunderstorm","abilityName":"Thunderstorm","abilityDesc":"6 lightning bolts over 3s on random enemies within 45, 40 damage each."}},"bite":{"range":4.6,"coneDeg":120,"cooldown":0.7,"dmgMul":2.2},"projectile":{"speed":70,"ttl":1.1,"hitRadiusGround":1.8,"hitRadiusFlying":1.15,"diveBonus":1.5,"diveHeight":6},"abilities":{"quickPeck":{"duration":4,"rateMul":2},"invisibility":{"duration":7},"featherBurst":{"count":7,"spreadDeg":70,"dmgMul":0.9},"flockCall":{"count":4,"dmgMul":0.8,"turnRate":6},"tinyTarget":{"duration":6,"speedMul":1.25,"radiusMul":0.5},"seedSnack":{"heal":40},"screech":{"radius":16,"slow":2},"crimsonRage":{"duration":5,"dmgMul":1.6},"windDash":{"speed":110,"duration":0.35,"contactDamage":22},"stealShine":{"range":22,"amount":30},"drillShot":{"damage":45},"hush":{"radius":22,"slow":2,"silence":6},"shadowShield":{"duration":4,"reflect":1},"fruitBomb":{"damage":55,"radius":8,"speed":32,"lob":18},"healingNest":{"radius":9,"duration":5,"healPerSec":16},"rainbowRing":{"count":12,"dmgMul":0.8},"stoop":{"speed":120,"duration":0.5,"contactDamage":60,"dive":55},"frostTalons":{"range":40,"damage":40,"slow":3},"casqueBash":{"speed":90,"duration":0.45,"contactDamage":40,"heal":20},"fishHook":{"range":35,"damage":35},"stormTalons":{"range":45,"damage":65,"slowDuration":1.2},"freedomStrike":{"radius":30,"damage":45,"slow":1},"thermalRise":{"invuln":2,"regen":70,"regenTime":5,"speedTime":6},"crushingGrip":{"range":25,"damage":95,"slow":2.5},"phoenixRebirth":{"radius":15,"damage":85,"reviveHp":0.5,"reviveDelay":1.5},"thunderstorm":{"radius":45,"bolts":6,"duration":3,"damage":40,"slow":0.8}},"pickups":{"count":44,"chests":8,"health":40,"bigHealth":100,"speedMul":1.6,"speedDuration":8,"shieldDuration":5,"bigShieldDuration":9,"pickRadius":2.4,"chestRadius":3.2},"storm":{"phases":[{"delay":30,"shrink":20,"radius":200},{"delay":20,"shrink":20,"radius":135},{"delay":20,"shrink":15,"radius":85},{"delay":15,"shrink":15,"radius":45},{"delay":15,"shrink":15,"radius":15},{"delay":10,"shrink":20,"radius":0}],"damageBase":4,"damagePerPhase":3},"match":{"maxPlayers":10,"lobbyCountdown":20,"spawnHeight":140,"fallSpeed":26,"climbSpeed":12,"maxAltitude":110,"initialSuperCooldown":6,"endScreenSeconds":30}}/*BALANCE_END*/;
 
 const G = {                      // global client game state
   phase: 'menu',                 // menu | lobby | playing | ended
@@ -1269,7 +1263,7 @@ const G = {                      // global client game state
   ents: new Map(), projectiles: new Map(), pickups: new Map(), chests: new Map(), effects: [],
   storm: null, alive: 10, ping: 0, spectateId: null, eliminated: false,
   me: null,                      // predicted local bird
-  input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, fire: false, flySeq: 0, superSeq: 0, biteSeq: 0 },
+  input: { mx: 0, mz: 0, vy: 0, ax: 0, az: 1, flySeq: 0, superSeq: 0, biteSeq: 0 },   // ax/az = the way the bird faces (supers like dashes use it)
   modeOverrideUntil: 0, lastStormTick: 0,
 };
 
@@ -1878,10 +1872,8 @@ function createBirdMesh(key) {
   c.add(g, new THREE.RingGeometry(R * 0.74, R * 0.92, 28), rm.ring, { p: [0, 0.05, 0], r: [-R90, 0, 0] });
   const shield = c.add(g, GEO.sph(R + 0.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.35, depthWrite: false }), { p: [0, cy, 0] }); shield.visible = false;
   const shadow = c.add(g, GEO.sph(R + 0.3, 12, 8), new THREE.MeshBasicMaterial({ color: 0x1a0030, transparent: true, opacity: 0.6, depthWrite: false }), { p: [0, cy, 0] }); shadow.visible = false;
-  const aimArrow = c.add(new THREE.Group(), GEO.cone(0.45, 5, 4), rm.ring, { p: [0, 0.3, 3.5 + size.z * 0.2], r: [R90, 0, 0] }); aimArrow.visible = false;
-  const aimPivot = new THREE.Group(); aimPivot.add(aimArrow); g.add(aimPivot);
   g.scale.setScalar(c.scale);
-  g.userData = { wings: c.wingPivots, body: c.bodyMesh, head: c.headGroup, headZ: c.headZ, mats: c.mats, shield, shadow, aimPivot, aimArrow, flap: Math.random() * 10,
+  g.userData = { wings: c.wingPivots, body: c.bodyMesh, head: c.headGroup, headZ: c.headZ, mats: c.mats, shield, shadow, flap: Math.random() * 10,
                  baseScale: c.scale, rarityColor: c.rc, top: top * c.scale, size };
   return g;
 }
@@ -1947,10 +1939,10 @@ function connect() {
 }
 function send(m) { if (ws && ws.readyState === WebSocket.OPEN) ws.receive(JSON.stringify(m)); }
 setInterval(() => { if (ws && ws.readyState === WebSocket.OPEN) send({ type: 'ping', t: performance.now() }); }, 2000);
-function sendInput() { if (G.phase === 'playing' && G.me && G.me.alive) { const i = G.input; send({ type: 'input', mx: i.mx, mz: i.mz, vy: i.vy, ax: i.ax, az: i.az, fire: i.fire, flySeq: i.flySeq, superSeq: i.superSeq, biteSeq: i.biteSeq }); } }
+function sendInput() { if (G.phase === 'playing' && G.me && G.me.alive) { const i = G.input; send({ type: 'input', mx: i.mx, mz: i.mz, vy: i.vy, ax: i.ax, az: i.az, flySeq: i.flySeq, superSeq: i.superSeq, biteSeq: i.biteSeq }); } }
 setInterval(sendInput, 50);   // steady heartbeat; changes are also sent immediately from the game loop (see inputChanged)
 function inputChanged() {   // true when the player did something the server should hear about right now
-  const i = G.input, sig = [Math.round(i.mx * 6), Math.round(i.mz * 6), Math.round(i.vy * 4), i.fire ? 1 : 0, i.flySeq, i.superSeq, i.biteSeq].join();
+  const i = G.input, sig = [Math.round(i.mx * 6), Math.round(i.mz * 6), Math.round(i.vy * 4), i.flySeq, i.superSeq, i.biteSeq].join();
   if (sig === G.lastSig) return false; G.lastSig = sig; return true;
 }
 
@@ -1975,7 +1967,7 @@ function handle(m) {
    7. SCREENS & MATCH FLOW
    ============================================================================= */
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('show', s.id === id)); }
-function setControlsVisible(v) { $('hud').classList.toggle('show', v); $('touch').classList.toggle('show', v && isMobile); ['joyMove', 'joyAim'].forEach(j => $(j).style.display = v && isMobile ? 'block' : 'none'); $('btnSuper').classList.toggle('show', v); }
+function setControlsVisible(v) { $('hud').classList.toggle('show', v); $('touch').classList.toggle('show', v && isMobile); $('joyMove').style.display = v && isMobile ? 'block' : 'none'; $('btnSuper').classList.toggle('show', v); $('btnBite').classList.toggle('show', v); }
 
 const colorHex = (c) => '#' + c.toString(16).padStart(6, '0');
 function birdInfo(key) { return BALANCE.birds[key || G.bird] || BALANCE.birds.sparrow; }
@@ -2010,7 +2002,7 @@ function showBirdDetail() {
   $('bdName').textContent = `${b.n}. ${b.name}`; $('bdRu').textContent = `(${b.ru})`;
   $('bdRar').textContent = `${r.name} · Super cooldown ${r.superCooldown}s`; $('bdRar').style.color = c;
   const max = { hp: 220, speed: 14, damage: 24 };
-  $('bdStats').innerHTML = [['HP', r.hp, max.hp], ['Speed', r.speed, max.speed], ['Damage', r.damage, max.damage]]
+  $('bdStats').innerHTML = [['HP', r.hp, max.hp], ['Speed', r.speed, max.speed], ['Bite', Math.round(r.damage * BALANCE.bite.dmgMul), 53]]
     .map(([n, v, m]) => `<div class="stat" style="--c:${c}"><span>${n} ${v}</span><div class="bar"><i style="width:${v / m * 100}%"></i></div></div>`).join('');
   $('bdAbility').innerHTML = `<b>★ ${b.abilityName}</b><br>${b.abilityDesc}`;
 }
@@ -2082,7 +2074,7 @@ function clearMatch() {
 function startMatch(m) {
   clearMatch();
   G.phase = 'playing'; G.eliminated = false; G.spectateId = null; G.storm = m.storm; G.me = null; G.alive = m.birds.length;
-  G.input.flySeq = 0; G.input.superSeq = 0; G.input.biteSeq = 0; G.input.fire = false; G.hist.length = 0; G.lastSig = '';
+  G.input.flySeq = 0; G.input.superSeq = 0; G.input.biteSeq = 0; G.hist.length = 0; biteHeld = false; G.lastSig = '';
   send({ type: 'ping', t: performance.now() }); setTimeout(() => send({ type: 'ping', t: performance.now() }), 400);   // measure the connection right away
   for (const b of m.birds) {
     const mesh = createBirdMesh(b.bird); scene.add(mesh);
@@ -2281,8 +2273,8 @@ function distToMe(p) { return G.me ? Math.hypot(p.x - G.me.x, p.z - G.me.z) : 99
 /* =============================================================================
    9. INPUT: touch joysticks, buttons, keyboard, mouse
    ============================================================================= */
-const joy = { move: { el: $('joyMove'), cx: 0, cy: 0, id: null, x: 0, y: 0, r: 58 }, aim: { el: $('joyAim'), cx: 0, cy: 0, id: null, x: 0, y: 0, r: 45, t0: 0, maxD: 0 } };
-const JOY_R = 45, JOY_CATCH = 95, TAP_MS = 300, TAP_MAX = 11, SWIPE_DEAD = 14, SWIPE_FULL = 70;   // a press shorter than TAP_MS that never leaves the TAP_MAX dead zone is a tap
+const joy = { move: { el: $('joyMove'), cx: 0, cy: 0, id: null, x: 0, y: 0, r: 58 } };
+const SWIPE_DEAD = 14, SWIPE_FULL = 70;
 const MOVE_ZONE = 0.42, MOVE_DEAD = 0.1, MOVE_FULL = 0.85;   // the left 42% of the screen starts the move stick; it reaches full speed at 85% of its travel
 let swipeVy = 0;   // -1..1 from a vertical swipe on the empty screen (+ = climb)
 let camDrag = null;
@@ -2290,7 +2282,7 @@ joy.move.el.classList.add('idle');
 function layoutJoysticks() { for (const j of Object.values(joy)) { const r = j.el.getBoundingClientRect(); j.cx = r.left + r.width / 2; j.cy = r.top + r.height / 2; } }
 function placeJoy(j) { const w = j.el.offsetWidth; j.el.style.left = (j.cx - w / 2) + 'px'; j.el.style.top = (j.cy - w / 2) + 'px'; j.el.style.bottom = 'auto'; }
 function setJoy(j, dx, dy) {
-  const R = j.r || JOY_R, l = Math.hypot(dx, dy), s = l > R ? R / l : 1; dx *= s; dy *= s;
+  const R = j.r, l = Math.hypot(dx, dy), s = l > R ? R / l : 1; dx *= s; dy *= s;
   j.x = dx / R; j.y = dy / R; j.el.querySelector('.knob').style.transform = `translate(${dx}px,${dy}px)`;
 }
 // Dead zone plus a gentle curve for the move stick: tiny thumb wobble does nothing, full speed arrives at 85% of the travel.
@@ -2303,11 +2295,6 @@ for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEv
 touchEl.addEventListener('contextmenu', (e) => e.preventDefault()); document.addEventListener('dblclick', (e) => e.preventDefault());
 touchEl.addEventListener('pointerdown', (e) => {
   SFX.init(); layoutJoysticks();
-  const aim = joy.aim;
-  if (aim.id === null && Math.hypot(e.clientX - aim.cx, e.clientY - aim.cy) < JOY_CATCH) {   // aim stick: fixed spot; a quick tap on it is the bite
-    aim.id = e.pointerId; aim.t0 = performance.now(); aim.maxD = 0; aim.sx = e.clientX; aim.sy = e.clientY;
-    setJoy(aim, e.clientX - aim.cx, e.clientY - aim.cy); touchEl.setPointerCapture(e.pointerId); return;
-  }
   const mv = joy.move;
   if (mv.id === null && e.clientX < window.innerWidth * MOVE_ZONE && e.clientY > window.innerHeight * 0.16) {   // move stick: floats, appears under the thumb
     mv.id = e.pointerId; mv.cx = e.clientX; mv.cy = e.clientY; placeJoy(mv); mv.el.classList.remove('idle');
@@ -2317,8 +2304,7 @@ touchEl.addEventListener('pointerdown', (e) => {
 });
 touchEl.addEventListener('pointermove', (e) => {
   for (const j of Object.values(joy)) if (j.id === e.pointerId) {
-    if (j === joy.aim) j.maxD = Math.max(j.maxD, Math.hypot(e.clientX - j.sx, e.clientY - j.sy));
-    else {   // the move stick follows a thumb that drifts past its edge, so you never have to chase it
+    {   // the move stick follows a thumb that drifts past its edge, so you never have to chase it
       const dx = e.clientX - j.cx, dy = e.clientY - j.cy, l = Math.hypot(dx, dy);
       if (l > j.r) { const k = (l - j.r) / l; j.cx += dx * k; j.cy += dy * k; placeJoy(j); }
     }
@@ -2332,8 +2318,6 @@ touchEl.addEventListener('pointermove', (e) => {
 });
 const endPointer = (e) => {
   for (const j of Object.values(joy)) if (j.id === e.pointerId) {
-    // a quick tap on the aim stick (no drag) is the bite
-    if (j === joy.aim && e.type === 'pointerup' && performance.now() - j.t0 < TAP_MS && j.maxD < TAP_MAX) useBite();
     j.id = null; setJoy(j, 0, 0);
     if (j === joy.move) { j.el.style.left = j.el.style.top = j.el.style.bottom = ''; j.el.classList.add('idle'); layoutJoysticks(); }   // back to its resting spot
   }
@@ -2348,8 +2332,14 @@ function toggleFly() {
   setFlyButton(G.me.mode);
 }
 function useSuper() { if (!G.me || !G.me.alive) return; const e = G.ents.get(G.myBirdId); if (e && e.superCd <= 0) G.input.superSeq++; }
-function useBite() { if (!G.me || !G.me.alive) return; const e = G.ents.get(G.myBirdId); if (e && e.biteCd <= 0) G.input.biteSeq++; }
+let biteHeld = false, lastBiteAt = 0;   // the BITE button (or left mouse) held: keep biting whenever the cooldown allows
+function useBite() {
+  if (!G.me || !G.me.alive) return; const e = G.ents.get(G.myBirdId), now = performance.now();
+  if (e && e.biteCd <= 0 && now - lastBiteAt > 120) { G.input.biteSeq++; lastBiteAt = now; G.biteLocalUntil = now + 450; }
+}
 $('btnSuper').addEventListener('pointerdown', (e) => { e.preventDefault(); SFX.init(); useSuper(); });
+$('btnBite').addEventListener('pointerdown', (e) => { e.preventDefault(); SFX.init(); biteHeld = true; useBite(); try { $('btnBite').setPointerCapture(e.pointerId); } catch (err) {} });
+for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) $('btnBite').addEventListener(ev, () => { biteHeld = false; });
 
 // keyboard + mouse (desktop testing)
 const keys = {}; let mouse = { x: 0, y: 0, down: false, drag: null };
@@ -2357,9 +2347,9 @@ window.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return; keys[e.code] = true; SFX.init();
   if (e.code === 'Space') { e.preventDefault(); toggleFly(); }
   if (e.code === 'KeyF') useSuper();
-  if (e.code === 'KeyB') useBite();
+  if (e.code === 'KeyB') { biteHeld = true; useBite(); }
 });
-window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+window.addEventListener('keyup', (e) => { keys[e.code] = false; if (e.code === 'KeyB') biteHeld = false; });
 canvas.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') return; SFX.init(); if (e.button === 0) mouse.down = true; if (e.button === 2 || e.button === 1) mouse.drag = { x: e.clientX, y: e.clientY }; });
 window.addEventListener('pointermove', (e) => { if (e.pointerType !== 'mouse') return; mouse.x = e.clientX; mouse.y = e.clientY; if (mouse.drag) { cam.yaw -= (e.clientX - mouse.drag.x) * 0.005; cam.pitch = clamp(cam.pitch + (e.clientY - mouse.drag.y) * 0.004, -0.15, 1.2); mouse.drag = { x: e.clientX, y: e.clientY }; } });
 window.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') return; if (e.button === 0) mouse.down = false; mouse.drag = null; });
@@ -2383,18 +2373,9 @@ function gatherInput(dt) {
   if (Math.abs(swipeVy) < 0.3) flyLatch = false;
   if (keys.ArrowLeft) cam.yaw += 2 * dt; if (keys.ArrowRight) cam.yaw -= 2 * dt;
   if (keys.ArrowUp) cam.pitch = clamp(cam.pitch - dt, -0.15, 1.2); if (keys.ArrowDown) cam.pitch = clamp(cam.pitch + dt, -0.15, 1.2);
-  // aim: right stick, or mouse position projected to the bird's height
-  const ax0 = joy.aim.x, ay0 = joy.aim.y, al = Math.hypot(ax0, ay0);
-  const aimLive = joy.aim.id !== null && (joy.aim.maxD >= TAP_MAX || performance.now() - joy.aim.t0 >= TAP_MS);   // a quick tap (a bite) must not fire feathers first
-  if (aimLive && al > 0.25) {
-    const nx = ax0 / al, ny = ay0 / al; i.ax = fx * -ny + rx * nx; i.az = fz * -ny + rz * nx; i.fire = true;
-  } else if (!isMobile && G.me) {
-    const ndc = new THREE.Vector2((mouse.x / window.innerWidth) * 2 - 1, -(mouse.y / window.innerHeight) * 2 + 1);
-    const ray = new THREE.Raycaster(); ray.setFromCamera(ndc, camera);
-    const o = ray.ray.origin, d = ray.ray.direction, t = (G.me.y - o.y) / (d.y || -0.0001);
-    if (t > 0) { const px = o.x + d.x * t, pz = o.z + d.z * t, l2 = Math.hypot(px - G.me.x, pz - G.me.z) || 1; i.ax = (px - G.me.x) / l2; i.az = (pz - G.me.z) / l2; }
-    i.fire = mouse.down;
-  } else i.fire = false;
+  // there is no aiming any more: supers that need a direction use the way the bird faces; a held bite button / left mouse keeps biting
+  if (G.me) { i.ax = Math.sin(G.me.yaw); i.az = Math.cos(G.me.yaw); }
+  if (biteHeld || (!isMobile && mouse.down)) useBite();
 }
 
 /* =============================================================================
@@ -2485,8 +2466,6 @@ function frame(now) {
     if (e.flash > 0) e.flash -= dt;
     if ((e.flags & 1024) && Math.random() < 0.25) fxBurst(e.x, e.y + 1, e.z, 0xfff1a8, 2, 3, 0.3);   // Sparrow's Quick Peck
     if (e.flags & 4 && Math.random() < 0.3) fxBurst(e.x, e.y + 0.5, e.z, 0xfde68a, 2, 2, 0.3);
-    u.aimArrow.visible = isMe && G.input.fire;
-    if (isMe) { u.aimPivot.rotation.y = Math.atan2(G.input.ax, G.input.az) - e.yaw; }
     if (!isMe) {
       const p = toScreen(e.x, e.y + u.top + 0.7, e.z), far = distToMe(e) > 140;
       if (p && !far) { e.label.style.display = 'block'; e.label.style.left = p.x + 'px'; e.label.style.top = p.y + 'px'; e.hf.style.width = (e.hp / e.maxHp * 100) + '%'; e.hf.style.background = e.hp / e.maxHp > 0.5 ? '#2dd36f' : e.hp / e.maxHp > 0.25 ? '#fbbf24' : '#ef4444'; }
@@ -2547,7 +2526,7 @@ function frame(now) {
     if (G.storm) { const S = G.storm; $('stormText').textContent = S.state === 'wait' ? `Storm shrinks in ${Math.ceil(S.timer)}s` : S.state === 'shrink' ? `⚠ STORM SHRINKING ${Math.ceil(S.timer)}s` : '⚠ FINAL ZONE'; }
     if (myEnt) {
       const st = BALANCE.rarities[birdInfo().rarity], cd = myEnt.superCd, ready = cd <= 0;
-      $('joyAim').classList.toggle('cd', myEnt.biteCd > 0);
+      $('btnBite').classList.toggle('cd', myEnt.biteCd > 0 || performance.now() < (G.biteLocalUntil || 0));
       $('btnSuper').classList.toggle('cd', !ready); $('cdRing').style.strokeDashoffset = (295.3 * (ready ? 0 : Math.min(1, cd / st.superCooldown))).toFixed(1);
       $('cdText').textContent = ready ? 'SUPER' : Math.ceil(cd);
     }
