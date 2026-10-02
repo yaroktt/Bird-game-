@@ -996,7 +996,10 @@ wss.on('connection', (ws) => {
 });
 
 // --- main loop
-setInterval(() => {
+// Fixed-step simulation that keeps up with real time: if a timer fires late (a busy machine, or in solo mode a page that
+// is busy drawing), the missed ticks are caught up instead of letting game time run slow. Capped so a long stall can't spiral.
+let lastTick = Date.now(), tickDebt = 0;
+function tickAll() {
   for (const room of rooms.values()) {
     try { room.update(DT); } catch (e) { console.error('room error', e); }
     if (room.state === 'ended' && room.endTimer <= 0) {
@@ -1004,6 +1007,10 @@ setInterval(() => {
       rooms.delete(room.id);
     }
   }
+}
+setInterval(() => {
+  const now = Date.now(); tickDebt += Math.min(0.25, (now - lastTick) / 1000); lastTick = now;
+  for (let n = 0; tickDebt >= DT - 1e-9 && n < 5; n++) { tickDebt -= DT; tickAll(); }
 }, 1000 / TICK_RATE);
 
 // --- start listening (skipped when this file is require()d by tests)

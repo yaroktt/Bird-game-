@@ -9,8 +9,9 @@
 <style>
   /* ---------------------------------------------------------------- base */
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1020; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #fff; }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; -webkit-touch-callout: none; background: #0b1020; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #fff; }
   #game { position: fixed; inset: 0; display: block; touch-action: none; }
+  button { touch-action: manipulation; }
   .screen { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; }
   .screen.show { display: flex; }
   .panel { background: rgba(10, 16, 32, .88); border: 1px solid rgba(255,255,255,.12); border-radius: 16px; padding: 14px 18px; max-width: 96vw; max-height: 96vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
@@ -80,7 +81,9 @@
   #touch.show { display: block; }
   .joy { display: none; position: fixed; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.10); border: 2px solid rgba(255,255,255,.35); pointer-events: none; }
   .joy .knob { position: absolute; left: 50%; top: 50%; width: 50px; height: 50px; margin: -25px; border-radius: 50%; background: rgba(255,255,255,.55); }
-  #joyMove { left: calc(28px + env(safe-area-inset-left)); bottom: 28px; }
+  #joyMove { left: calc(24px + env(safe-area-inset-left)); bottom: 24px; width: 132px; height: 132px; }   /* resting spot; the stick actually appears under your thumb */
+  #joyMove .knob { width: 58px; height: 58px; margin: -29px; }
+  .joy.idle { opacity: .5; }
   #joyAim { right: calc(28px + env(safe-area-inset-right)); bottom: 28px; border-color: rgba(255,120,120,.5); }
   #joyAim .knob { background: rgba(255,140,140,.6); }
   #joyAim .hint { position: absolute; left: 0; right: 0; top: -17px; text-align: center; font-size: 10px; font-weight: 800; opacity: .85; text-shadow: 0 1px 2px #000; }
@@ -165,6 +168,8 @@
     <div class="setRow"><label for="nameInput">Your name</label><input type="text" id="nameInput" maxlength="14" placeholder="Bird name"></div>
     <div class="setRow"><span>Sound</span><button class="btn secondary small" id="soundBtn">On</button></div>
     <div class="setRow"><span>Graphics</span><button class="btn secondary small" id="gfxBtn">High</button></div>
+    <div class="setRow"><label for="sensRange">Camera speed</label><input type="range" id="sensRange" min="40" max="220" step="10" value="100" style="width:170px"></div>
+    <div class="setRow"><span>Vibration</span><button class="btn secondary small" id="vibBtn">On</button></div>
     <div id="help">Phone: left stick walks/flies. Swipe the empty screen: sideways to turn the camera, up to take off and climb, down to descend and land. Right stick: drag to aim &amp; auto-fire, tap it to bite.<br>Desktop: WASD move · Space fly/land · Q/E down/up · hold left mouse to shoot at cursor · right-drag or arrows to look · F = super · B = bite</div>
     <div class="row" style="margin-top:10px"><button class="btn" id="settingsBack">Back</button></div>
   </div>
@@ -282,7 +287,8 @@ const G = {                      // global client game state
   phase: 'menu',                 // menu | lobby | playing | ended
   myId: null, myBirdId: null, token: store.get('bgu_token'),
   name: store.get('bgu_name') || '', bird: store.get('bgu_bird') || 'sparrow',
-  quality: store.get('bgu_quality') || 'high',
+  quality: store.get('bgu_quality') || 'high', sens: Number(store.get('bgu_sens')) || 1, vib: store.get('bgu_vib') !== 'off',
+  hist: [], lagMs: 0, lastSig: '',
   ents: new Map(), projectiles: new Map(), pickups: new Map(), chests: new Map(), effects: [],
   storm: null, alive: 10, ping: 0, spectateId: null, eliminated: false,
   me: null,                      // predicted local bird
@@ -975,7 +981,12 @@ function connect() {
 }
 function send(m) { if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(m)); }
 setInterval(() => { if (ws && ws.readyState === WebSocket.OPEN) send({ type: 'ping', t: performance.now() }); }, 2000);
-setInterval(() => { if (G.phase === 'playing' && G.me && G.me.alive) { const i = G.input; send({ type: 'input', mx: i.mx, mz: i.mz, vy: i.vy, ax: i.ax, az: i.az, fire: i.fire, flySeq: i.flySeq, superSeq: i.superSeq, biteSeq: i.biteSeq }); } }, 50);
+function sendInput() { if (G.phase === 'playing' && G.me && G.me.alive) { const i = G.input; send({ type: 'input', mx: i.mx, mz: i.mz, vy: i.vy, ax: i.ax, az: i.az, fire: i.fire, flySeq: i.flySeq, superSeq: i.superSeq, biteSeq: i.biteSeq }); } }
+setInterval(sendInput, 50);   // steady heartbeat; changes are also sent immediately from the game loop (see inputChanged)
+function inputChanged() {   // true when the player did something the server should hear about right now
+  const i = G.input, sig = [Math.round(i.mx * 6), Math.round(i.mz * 6), Math.round(i.vy * 4), i.fire ? 1 : 0, i.flySeq, i.superSeq, i.biteSeq].join();
+  if (sig === G.lastSig) return false; G.lastSig = sig; return true;
+}
 
 function handle(m) {
   switch (m.type) {
@@ -990,7 +1001,7 @@ function handle(m) {
     case 'state': onState(m); break;
     case 'eliminated': onEliminated(m); break;
     case 'end': onEnd(m); break;
-    case 'pong': G.ping = Math.round(performance.now() - m.t); break;
+    case 'pong': G.ping = Math.round(performance.now() - m.t); G.lagMs = G.lagMs ? G.lagMs * 0.6 + G.ping * 0.4 : G.ping; break;
   }
 }
 
@@ -1069,6 +1080,9 @@ function applyQuality() {
 }
 $('soundBtn').onclick = () => { SFX.enabled = !SFX.enabled; store.set('bgu_sound', SFX.enabled ? 'on' : 'off'); $('soundBtn').textContent = SFX.enabled ? 'On' : 'Off'; SFX.init(); SFX.play('pickup'); };
 $('gfxBtn').onclick = () => { G.quality = G.quality === 'high' ? 'low' : 'high'; store.set('bgu_quality', G.quality); applyQuality(); };
+$('sensRange').oninput = () => { G.sens = Number($('sensRange').value) / 100; store.set('bgu_sens', String(G.sens)); };
+$('vibBtn').onclick = () => { G.vib = !G.vib; store.set('bgu_vib', G.vib ? 'on' : 'off'); $('vibBtn').textContent = G.vib ? 'On' : 'Off'; vibrate(40); };
+function vibrate(p) { if (G.vib && navigator.vibrate) { try { navigator.vibrate(p); } catch (e) {} } }   // Android only: iOS Safari has no vibration API
 $('nameInput').addEventListener('input', () => { G.name = $('nameInput').value.slice(0, 14); store.set('bgu_name', G.name); });
 $('settingsBtn').onclick = () => { SFX.init(); showScreen('settings'); };
 $('settingsBack').onclick = () => showScreen('menu');
@@ -1102,7 +1116,8 @@ function clearMatch() {
 function startMatch(m) {
   clearMatch();
   G.phase = 'playing'; G.eliminated = false; G.spectateId = null; G.storm = m.storm; G.me = null; G.alive = m.birds.length;
-  G.input.flySeq = 0; G.input.superSeq = 0; G.input.biteSeq = 0; G.input.fire = false;
+  G.input.flySeq = 0; G.input.superSeq = 0; G.input.biteSeq = 0; G.input.fire = false; G.hist.length = 0; G.lastSig = '';
+  send({ type: 'ping', t: performance.now() }); setTimeout(() => send({ type: 'ping', t: performance.now() }), 400);   // measure the connection right away
   for (const b of m.birds) {
     const mesh = createBirdMesh(b.bird); scene.add(mesh);
     const label = document.createElement('div'); label.className = 'label';
@@ -1131,7 +1146,7 @@ function killFeed(html) {
 }
 function nameOf(id) { const e = G.ents.get(id); return e ? `<span style="color:#${BALANCE.rarities[e.rarity].color.toString(16).padStart(6, '0')}">${esc(e.name)}</span>` : '???'; }
 function onEliminated(m) {
-  G.eliminated = true; if (G.me) G.me.alive = false;
+  G.eliminated = true; if (G.me) G.me.alive = false; vibrate([60, 40, 140]);
   $('endTitle').textContent = 'ELIMINATED'; $('endTitle').style.filter = 'hue-rotate(300deg)';
   $('endSub').innerHTML = `You placed <b>#${m.placement}</b> with <b>${m.kills}</b> kills.<br>${m.killer ? 'Knocked out by <b>' + esc(m.killer) + '</b>' : 'Caught by the storm'}`;
   $('board').innerHTML = ''; $('watchBtn').style.display = ''; showScreen('end'); SFX.play('death');
@@ -1167,8 +1182,8 @@ function onState(m) {
     e.hp = hp; e.flags = flags; e.alive = !!alive; e.superCd = superCd; e.kills = kills; e.biteCd = biteCd || 0;
     if (id === G.myBirdId && G.me) {
       const me = G.me;
-      if (!me.synced) { me.x = x; me.y = y; me.z = z; me.yaw = yaw; me.synced = true; }
-      else { const ex = x - me.x, ey = y - me.y, ez = z - me.z, d = Math.hypot(ex, ey, ez); if (d > 6) { me.x = x; me.y = y; me.z = z; } else { me.x += ex * 0.3; me.y += ey * 0.3; me.z += ez * 0.3; } }
+      if (!me.synced) { me.x = x; me.y = y; me.z = z; me.yaw = yaw; me.synced = true; G.hist.length = 0; }
+      else reconcile(me, x, y, z, now);
       if (now > G.modeOverrideUntil && me.mode !== mode) { me.mode = mode; setFlyButton(mode); }
       me.alive = e.alive; me.flags = flags;
       if (!(flags & 8)) me.dashT = 0;
@@ -1180,6 +1195,24 @@ function onState(m) {
     if (!wasAlive && e.alive) e.mesh.visible = true;
   }
   for (const ev of m.ev) onEvent(ev);
+}
+// Latency-compensated correction. A server snapshot shows where the bird was about one round trip ago, so it must be
+// compared with where our prediction was THEN, not where it is now. (Comparing with "now" tugs the bird backward
+// while you walk and slides it forward after you let go.) Corrections are blended in over a few snapshots.
+function histAt(t) {
+  const h = G.hist; if (h.length < 2) return null;
+  if (t <= h[0].t) return h[0]; if (t >= h[h.length - 1].t) return h[h.length - 1];
+  for (let i = h.length - 1; i > 0; i--) if (h[i - 1].t <= t) { const a = h[i - 1], b = h[i], k = (t - a.t) / (b.t - a.t || 1); return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k), z: lerp(a.z, b.z, k) }; }
+  return h[0];
+}
+function reconcile(me, x, y, z, now) {
+  const ref = histAt(now - clamp(G.lagMs, 0, 800) - 50) || me;   // 50 ms: input sampling + server tick
+  const ex = x - ref.x, ey = y - ref.y, ez = z - ref.z, d = Math.hypot(ex, ey, ez);
+  if (d > 8) { me.x = x; me.y = y; me.z = z; G.hist.length = 0; return; }   // far off (respawn, hook, ...): snap
+  if (d < 0.12) return;                                                         // too small to be worth correcting
+  const k = 0.4, dx = ex * k, dy = ey * k, dz = ez * k;
+  me.x += dx; me.y += dy; me.z += dz;
+  for (const q of G.hist) { q.x += dx; q.y += dy; q.z += dz; }                  // keep the history consistent with the corrected path
 }
 function onEvent(ev) {
   const e = G.ents.get(ev.b || ev.t || ev.o || ev.v || -1);
@@ -1201,6 +1234,7 @@ function onEvent(ev) {
       e.biteT = 0.25;                                         // head lunge, see the visuals loop
       const fx = Math.sin(ev.yaw), fz = Math.cos(ev.yaw), mx = ev.x + fx * 1.9, my = ev.y + 1.3, mz = ev.z + fz * 1.9;
       if (ev.hit) {
+        if (ev.b === G.myBirdId) vibrate(25);
         fxBurst(ev.tx, ev.ty + 1, ev.tz, 0xffffff, 14, 8, 0.45); fxBurst(ev.tx, ev.ty + 1, ev.tz, 0xff5a6e, 8, 6, 0.4);
         if (ev.b === G.myBirdId || distToMe(ev) < 40) SFX.play('chomp');
       } else { fxBurst(mx, my, mz, 0xffffff, 5, 4, 0.3); if (ev.b === G.myBirdId) SFX.play('bite'); }
@@ -1214,7 +1248,7 @@ function onEvent(ev) {
       if (ev.blocked) { floater(pos.x, pos.y + 2.4, pos.z, 'BLOCKED', '#93c5fd'); break; }
       t.flash = 0.2;
       floater(pos.x, pos.y + 2.4, pos.z, (ev.dive ? '💥 ' : '') + '-' + ev.d, ev.dive ? '#fbbf24' : (t.id === G.myBirdId ? '#f87171' : '#fff'));
-      if (t.id === G.myBirdId) { G.hurtFlash = 1; SFX.play('hurt'); } else if (ev.by === G.myBirdId) SFX.play('hit');
+      if (t.id === G.myBirdId) { G.hurtFlash = 1; SFX.play('hurt'); vibrate(35); } else if (ev.by === G.myBirdId) SFX.play('hit');
       break;
     }
     case 'kill': {
@@ -1225,6 +1259,7 @@ function onEvent(ev) {
       const cause = ev.cause === 'storm' ? `${nameOf(ev.v)} was caught in the storm` : ev.cause === 'reflect' ? `${nameOf(ev.v)} hit ${nameOf(ev.k)}'s shadow shield` : `${nameOf(ev.k)} ${ICON[ev.cause] || '🪶'} ${nameOf(ev.v)}`;
       killFeed(cause + (ev.rebirth ? ' … <b>but rises again!</b>' : ''));
       if (ev.v !== G.myBirdId && distToMe(pos) < 80) SFX.play('death');
+      if (ev.k === G.myBirdId && ev.v !== G.myBirdId) vibrate([30, 40, 70]);
       if (ev.k === G.myBirdId && ev.v !== G.myBirdId) $('killText').textContent = '☠ ' + (G.ents.get(G.myBirdId).kills + 1);
       break;
     }
@@ -1268,6 +1303,7 @@ function onEvent(ev) {
         default: fxBurst(ev.x, ev.y + 0.8, ev.z, rc, 14, 8, 0.5);
       }
       if (near && ev.kind !== 'stormTalons' && !ev.quiet) SFX.play('super');
+      if (ev.b === G.myBirdId && !ev.quiet) vibrate(30);
       break;
     }
     case 'mode': if (e && e.id !== G.myBirdId) { fxBurst(e.x, e.y + 0.5, e.z, 0xffffff, 6, 4, 0.3); } break;
@@ -1279,31 +1315,51 @@ function distToMe(p) { return G.me ? Math.hypot(p.x - G.me.x, p.z - G.me.z) : 99
 /* =============================================================================
    9. INPUT: touch joysticks, buttons, keyboard, mouse
    ============================================================================= */
-const joy = { move: { el: $('joyMove'), cx: 0, cy: 0, id: null, x: 0, y: 0 }, aim: { el: $('joyAim'), cx: 0, cy: 0, id: null, x: 0, y: 0, t0: 0, maxD: 0 } };
-const JOY_R = 45, JOY_CATCH = 95, TAP_MS = 300, TAP_MAX = 11, SWIPE_DEAD = 14, SWIPE_FULL = 70;
-let swipeVy = 0;   // -1..1 from a vertical swipe on the empty screen (+ = climb)   // a press shorter than TAP_MS that never leaves the TAP_MAX dead zone is a tap
+const joy = { move: { el: $('joyMove'), cx: 0, cy: 0, id: null, x: 0, y: 0, r: 58 }, aim: { el: $('joyAim'), cx: 0, cy: 0, id: null, x: 0, y: 0, r: 45, t0: 0, maxD: 0 } };
+const JOY_R = 45, JOY_CATCH = 95, TAP_MS = 300, TAP_MAX = 11, SWIPE_DEAD = 14, SWIPE_FULL = 70;   // a press shorter than TAP_MS that never leaves the TAP_MAX dead zone is a tap
+const MOVE_ZONE = 0.42, MOVE_DEAD = 0.1, MOVE_FULL = 0.85;   // the left 42% of the screen starts the move stick; it reaches full speed at 85% of its travel
+let swipeVy = 0;   // -1..1 from a vertical swipe on the empty screen (+ = climb)
 let camDrag = null;
+joy.move.el.classList.add('idle');
 function layoutJoysticks() { for (const j of Object.values(joy)) { const r = j.el.getBoundingClientRect(); j.cx = r.left + r.width / 2; j.cy = r.top + r.height / 2; } }
+function placeJoy(j) { const w = j.el.offsetWidth; j.el.style.left = (j.cx - w / 2) + 'px'; j.el.style.top = (j.cy - w / 2) + 'px'; j.el.style.bottom = 'auto'; }
 function setJoy(j, dx, dy) {
-  const l = Math.hypot(dx, dy), s = l > JOY_R ? JOY_R / l : 1; dx *= s; dy *= s;
-  j.x = dx / JOY_R; j.y = dy / JOY_R; j.el.querySelector('.knob').style.transform = `translate(${dx}px,${dy}px)`;
+  const R = j.r || JOY_R, l = Math.hypot(dx, dy), s = l > R ? R / l : 1; dx *= s; dy *= s;
+  j.x = dx / R; j.y = dy / R; j.el.querySelector('.knob').style.transform = `translate(${dx}px,${dy}px)`;
+}
+// Dead zone plus a gentle curve for the move stick: tiny thumb wobble does nothing, full speed arrives at 85% of the travel.
+function moveCurve(x, y) {
+  const m = Math.hypot(x, y); if (m < MOVE_DEAD) return [0, 0];
+  const n = Math.min(1, (m - MOVE_DEAD) / (MOVE_FULL - MOVE_DEAD)), out = Math.pow(n, 1.2); return [x / m * out, y / m * out];
 }
 const touchEl = $('touch');
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault());   // no pinch-zoom of the page
+touchEl.addEventListener('contextmenu', (e) => e.preventDefault()); document.addEventListener('dblclick', (e) => e.preventDefault());
 touchEl.addEventListener('pointerdown', (e) => {
   SFX.init(); layoutJoysticks();
-  for (const j of Object.values(joy)) {
-    const hit = Math.hypot(e.clientX - j.cx, e.clientY - j.cy) < JOY_CATCH;
-    if (j.id === null && hit) {
-      j.id = e.pointerId; if (j === joy.aim) { j.t0 = performance.now(); j.maxD = 0; j.sx = e.clientX; j.sy = e.clientY; }   // tap = never moved from where the finger landed
-      setJoy(j, e.clientX - j.cx, e.clientY - j.cy); touchEl.setPointerCapture(e.pointerId); return;
-    }
+  const aim = joy.aim;
+  if (aim.id === null && Math.hypot(e.clientX - aim.cx, e.clientY - aim.cy) < JOY_CATCH) {   // aim stick: fixed spot; a quick tap on it is the bite
+    aim.id = e.pointerId; aim.t0 = performance.now(); aim.maxD = 0; aim.sx = e.clientX; aim.sy = e.clientY;
+    setJoy(aim, e.clientX - aim.cx, e.clientY - aim.cy); touchEl.setPointerCapture(e.pointerId); return;
+  }
+  const mv = joy.move;
+  if (mv.id === null && e.clientX < window.innerWidth * MOVE_ZONE && e.clientY > window.innerHeight * 0.16) {   // move stick: floats, appears under the thumb
+    mv.id = e.pointerId; mv.cx = e.clientX; mv.cy = e.clientY; placeJoy(mv); mv.el.classList.remove('idle');
+    setJoy(mv, 0, 0); touchEl.setPointerCapture(e.pointerId); return;
   }
   camDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, y0: e.clientY };   // empty screen: swipe sideways = turn, up/down = climb / descend
 });
 touchEl.addEventListener('pointermove', (e) => {
-  for (const j of Object.values(joy)) if (j.id === e.pointerId) { if (j === joy.aim) j.maxD = Math.max(j.maxD, Math.hypot(e.clientX - j.sx, e.clientY - j.sy)); setJoy(j, e.clientX - j.cx, e.clientY - j.cy); return; }
+  for (const j of Object.values(joy)) if (j.id === e.pointerId) {
+    if (j === joy.aim) j.maxD = Math.max(j.maxD, Math.hypot(e.clientX - j.sx, e.clientY - j.sy));
+    else {   // the move stick follows a thumb that drifts past its edge, so you never have to chase it
+      const dx = e.clientX - j.cx, dy = e.clientY - j.cy, l = Math.hypot(dx, dy);
+      if (l > j.r) { const k = (l - j.r) / l; j.cx += dx * k; j.cy += dy * k; placeJoy(j); }
+    }
+    setJoy(j, e.clientX - j.cx, e.clientY - j.cy); return;
+  }
   if (camDrag && camDrag.id === e.pointerId) {
-    cam.yaw -= (e.clientX - camDrag.x) * 0.006; camDrag.x = e.clientX;
+    cam.yaw -= (e.clientX - camDrag.x) / Math.max(320, window.innerWidth) * 4 * G.sens; camDrag.x = e.clientX;   // sideways swipe: a full-screen swipe turns about 230 degrees at the default speed
     const dy = e.clientY - camDrag.y0, over = Math.abs(dy) - SWIPE_DEAD;   // vertical distance from where the finger went down (past a dead zone) sets the climb rate
     swipeVy = over > 0 ? clamp(-Math.sign(dy) * over / SWIPE_FULL, -1, 1) : 0;
   }
@@ -1313,6 +1369,7 @@ const endPointer = (e) => {
     // a quick tap on the aim stick (no drag) is the bite
     if (j === joy.aim && e.type === 'pointerup' && performance.now() - j.t0 < TAP_MS && j.maxD < TAP_MAX) useBite();
     j.id = null; setJoy(j, 0, 0);
+    if (j === joy.move) { j.el.style.left = j.el.style.top = j.el.style.bottom = ''; j.el.classList.add('idle'); layoutJoysticks(); }   // back to its resting spot
   }
   if (camDrag && camDrag.id === e.pointerId) { camDrag = null; swipeVy = 0; flyLatch = false; }
 };
@@ -1343,10 +1400,11 @@ window.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') ret
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
 let flyLatch = false;   // stops one push of the flight stick from toggling flight twice
+window.__bird = () => G.me && G.me.synced ? { x: G.me.x, y: G.me.y, z: G.me.z, mode: G.me.mode } : null;   // read-only peek used by the automated tests
 // Builds this frame's input from joysticks / keys, relative to the camera.
 function gatherInput(dt) {
   const i = G.input, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), rx = -Math.cos(cam.yaw), rz = Math.sin(cam.yaw);
-  let jx = joy.move.x, jy = joy.move.y;
+  let [jx, jy] = moveCurve(joy.move.x, joy.move.y);
   if (keys.KeyW) jy -= 1; if (keys.KeyS) jy += 1; if (keys.KeyA) jx -= 1; if (keys.KeyD) jx += 1;
   const l = Math.hypot(jx, jy); if (l > 1) { jx /= l; jy /= l; }
   i.mx = fx * -jy + rx * jx; i.mz = fz * -jy + rz * jx;
@@ -1410,13 +1468,14 @@ function frame(now) {
   // ---- local prediction
   const me = G.me, myEnt = G.ents.get(G.myBirdId);
   if (me && me.alive && me.synced) {
-    gatherInput(dt);
+    gatherInput(dt); if (inputChanged()) sendInput();
     const bi = birdInfo(), st = BALANCE.rarities[bi.rarity], boost = ((me.flags & 4) ? BALANCE.pickups.speedMul : 1) * ((me.flags & 256) ? BALANCE.abilities.tinyTarget.speedMul : 1), slow = (me.flags & 16) ? 0.4 : 1;
     if ((me.flags & 8) && me.dashT <= 0) {   // the server started a dash (Wind Dash / Stoop / Casque Bash): predict it locally
       const cfg = BALANCE.abilities[bi.ability] || {};
       me.dashT = cfg.duration || 0.35; me.dashSpeed = cfg.speed || 110; me.dashY = (bi.ability === 'stoop' && me.mode === 1) ? -cfg.dive : 0; me.dashX = G.input.ax; me.dashZ = G.input.az;
     }
     moveBird(me, G.input, dt, { speed: st.speed * boost * slow, flySpeed: st.flySpeed * boost * slow, climbSpeed: BALANCE.match.climbSpeed, fallSpeed: BALANCE.match.fallSpeed, maxAlt: BALANCE.match.maxAltitude, dashSpeed: me.dashSpeed || BALANCE.abilities.windDash.speed });
+    G.hist.push({ t: now, x: me.x, y: me.y, z: me.z }); while (G.hist.length > 2 && now - G.hist[0].t > 2000) G.hist.shift();
     myEnt.x = me.x; myEnt.y = me.y; myEnt.z = me.z; myEnt.yaw = me.yaw; myEnt.mode = me.mode; myEnt.pvy = me.vy;
   }
 
@@ -1536,7 +1595,7 @@ function frame(now) {
    BOOT
    ============================================================================= */
 buildTerrain(); buildScatter(); buildLandmarks(); buildStorm(); buildMinimapBase();
-$('nameInput').value = G.name; $('soundBtn').textContent = SFX.enabled ? 'On' : 'Off';
+$('nameInput').value = G.name; $('soundBtn').textContent = SFX.enabled ? 'On' : 'Off'; $('sensRange').value = Math.round(G.sens * 100); $('vibBtn').textContent = G.vib ? 'On' : 'Off';
 buildBirdList(); applyQuality();
 resize(); camera.position.set(0, 60, -120); camera.lookAt(0, 20, 0);
 connect();

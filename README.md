@@ -63,13 +63,20 @@ For faster testing: `LOBBY_COUNTDOWN=3 node server.js`.
 
 | Phone (landscape) | Desktop |
 | --- | --- |
-| Left stick: walk / fly | WASD: move |
+| Move stick: press anywhere on the left 40% of the screen and the stick appears under your thumb (it follows if your thumb drifts) | WASD: move |
 | Swipe the empty screen up = take off and climb, down = descend and land (hold the swipe to keep climbing) | Space: fly / land |
-| Swipe sideways = turn the camera | Q / E: down / up |
+| Swipe sideways = turn the camera (speed is a Settings slider) | Q / E: down / up |
 | Right stick: drag to aim + auto-fire, **tap it to bite** | Hold left mouse: shoot at cursor |
 | SUPER button | F: super ability |
 | | B: bite |
 | | Right-drag or arrow keys: rotate camera |
+
+## Mobile feel
+
+- The move stick floats under your thumb, is large, follows a drifting thumb, and has a small dead zone and a soft curve: light pushes walk slowly, 85% of the travel is full speed.
+- Settings has **Camera speed** (swipe turning) and **Vibration** (Android; iOS has no web vibration).
+- Movement is predicted on your device and corrected against the server by comparing with where you were one round-trip ago, so you stop when you let go instead of sliding, even on a slow connection.
+- Control changes are sent to the server immediately, and the server's simulation catches up missed ticks so game time never runs slow.
 
 ## Editing balance
 
