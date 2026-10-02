@@ -13,7 +13,7 @@ A 3D mobile battle royale for 10 birds. Three.js client in a single `index.html`
 
 The bite is the only basic attack: there is no shooting. Press **BITE** (bottom right on a phone; hold it to keep biting; **B** or the left mouse button on desktop) to chomp the nearest enemy within about 4.6 units, in front or to the sides. It works on flying and ground birds, so you have to get close: chase, dodge, land beside a ground bird or stoop onto it.
 
-- Damage is the bird's rarity damage x 2.2 (about 26 for Common up to 53 for Legendary), with a 0.7s cooldown.
+- Damage is 14 x 2.2 = about 31 with a 0.7s cooldown (the Hummingbird bites faster for less).
 - A flying bird biting a ground bird while diving deals 1.5x (a stoop).
 - Invisible birds (Pigeon) can't be bitten. Shields and Shadow Shield still block or reflect bites.
 - Bots chase you and bite too.
@@ -23,7 +23,7 @@ Tune it in `BALANCE.bite` in `server.js`.
 
 ## Birds
 
-The start menu has **Play**, **Settings** (name, sound, graphics) and **Birds** (pick one of 26 birds; each has its own super ability). Rarity sets the stats (HP, speed, bite damage, super cooldown); the bird sets the ability. Every bird also has its own 3D model (built from code shapes in `SPECIES` in `index.html`): the Toucan's huge bill, the Flamingo's long neck and legs, the Condor's white ruff, the Phoenix's flame tail, the Thunderbird's lightning wings, and so on.
+The start menu has **Play**, **Settings** (name, sound, graphics) and **Birds** (pick one of 27 birds; each has its own super ability). Rarity only says how unique / hard to unlock a bird is: every rarity has the same stats (140 HP, speed 12, 31 bite damage, 14s super). Birds differ by super ability, hitbox (tiny / small / mid / large) and optional per-bird tweaks in `BALANCE.birds` (`hpMul`, `speedMul`, `biteCooldown`, `biteDmgMul`). Every bird also has its own 3D model (built from code shapes in `SPECIES` in `index.html`): the Toucan's huge bill, the Flamingo's long neck and legs, the Condor's white ruff, the Phoenix's flame tail, the Thunderbird's lightning wings, and so on.
 
 | # | Bird | Rarity | Super ability | What it does |
 | --- | --- | --- | --- | --- |
@@ -53,6 +53,7 @@ The start menu has **Play**, **Settings** (name, sound, graphics) and **Birds** 
 | 24 | Harpy Eagle (Гарпия) | Mythic | Crushing Grip | Seize the nearest enemy within 25: 95 damage and a 2.5s slow. |
 | 25 | Phoenix (Феникс) | Legendary | Phoenix Rebirth | Huge fire explosion. If you are knocked out afterwards you revive once at half health. |
 | 26 | Thunderbird (Птица грома) | Legendary | Thunderstorm | 6 lightning bolts over 3s on random enemies within 45, 40 damage each. |
+| 27 | Hummingbird (Колибри) | Legendary | Hyper Rush | Tiny hitbox, very rapid light bites, and the fastest bird in the game; the super adds a 5s speed boost (x1.6). 91 HP. |
 
 ## Run the app version
 
