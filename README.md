@@ -15,7 +15,7 @@ Every bird has a **BITE** button (key **B** on desktop): a short-range chomp on 
 
 ## Birds
 
-The start menu has **Play**, **Settings** (name, sound, graphics) and **Birds** (pick one of 26 birds; each has its own super ability). Rarity sets the stats (HP, speed, damage, super cooldown); the bird sets the ability.
+The start menu has **Play**, **Settings** (name, sound, graphics) and **Birds** (pick one of 26 birds; each has its own super ability). Rarity sets the stats (HP, speed, damage, super cooldown); the bird sets the ability. Every bird also has its own 3D model (built from code shapes in `SPECIES` in `index.html`): the Toucan's huge bill, the Flamingo's long neck and legs, the Condor's white ruff, the Phoenix's flame tail, the Thunderbird's lightning wings, and so on.
 
 | # | Bird | Rarity | Super ability | What it does |
 | --- | --- | --- | --- | --- |

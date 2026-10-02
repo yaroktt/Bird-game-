@@ -1423,18 +1423,11 @@ function buildStorm() {
 /* =============================================================================
    5. BIRD MODELS, PICKUPS, EFFECTS
    ============================================================================= */
-// Optional per-bird looks: s = size, head/beak/crest = colors, beakLen = beak length multiplier.
-const BIRD_LOOK = {
-  sparrow: { s: 0.85 }, pigeon: { head: 0x5e6b8a }, robin: { s: 0.9, head: 0xe0653a }, starling: { s: 0.9, beak: 0xe8d44a }, wren: { s: 0.75 }, finch: { s: 0.85, head: 0xc04a4a },
-  blueJay: { crest: 0x2f6fe0, head: 0xe8efff }, cardinal: { crest: 0xd7263d, head: 0xb01e32 }, kingfisher: { s: 0.9, head: 0xff9a3c, beak: 0x222222, beakLen: 1.7 },
-  magpie: { s: 1.05, head: 0x14141c, beak: 0x111111 }, woodpecker: { crest: 0xe03030, beak: 0x333333, beakLen: 1.3 },
-  barnOwl: { s: 1.1, head: 0xfff4e0, beak: 0xe9d5a8, beakLen: 0.6 }, raven: { s: 1.15, beak: 0x222222 }, toucan: { s: 1.1, head: 0xfff2b0, beak: 0xff8c1a, beakLen: 2.7 },
-  flamingo: { s: 1.2, head: 0xf8a5c4, beak: 0x222222 }, macaw: { s: 1.15, head: 0xffd23f, beak: 0xf4f4f4, beakLen: 1.2 },
-  peregrine: { s: 1.05, head: 0x2b3642, beak: 0xf2c14e }, snowyOwl: { s: 1.2, head: 0xffffff, beak: 0x222222, beakLen: 0.6 }, hornbill: { s: 1.2, crest: 0xf2c14e, beak: 0xf2c14e, beakLen: 2.3 },
-  osprey: { s: 1.15, head: 0xffffff, beak: 0x222222 }, goldenEagle: { s: 1.25, head: 0xc9962f, beak: 0xf2c14e },
-  baldEagle: { s: 1.3, head: 0xffffff, beak: 0xf2c14e }, condor: { s: 1.45, head: 0xdcdcdc, beak: 0xdddddd }, harpy: { s: 1.3, crest: 0x3a3a3a, head: 0xaab4be, beak: 0x333333 },
-  phoenix: { s: 1.35, head: 0xffd23f, crest: 0xff3b1a }, thunderbird: { s: 1.4, head: 0xb3b3ff, crest: 0xffe066 },
-};
+/* ---- bird models: one builder per species ---------------------------------------------------
+   Birds face +z, y is up, feet at y = 0. Each builder in SPECIES gets a context `c` and assembles its
+   bird from primitives: c.torso / c.head / c.wings / c.tail / c.legs, then species decorations.
+   Only c.m() materials (Lambert) take damage flashes and the Pigeon's invisibility; c.fx() materials
+   are flat and glowing, used for fire and lightning. */
 function rarityMats(rarity) {   // aura + ground ring are shared per rarity
   if (!MAT.bird[rarity]) {
     const c = new THREE.Color(BALANCE.rarities[rarity].color);
@@ -1443,40 +1436,442 @@ function rarityMats(rarity) {   // aura + ground ring are shared per rarity
   }
   return MAT.bird[rarity];
 }
+const R90 = Math.PI / 2, EMIS = 0;   // resting rarity tint on a model (zero: even a faint tint turns a black bird green); flashes and rage go higher
+// Flat feather shapes (wings, tails): a polygon given as [x, z] points (z forward), extruded to thickness th.
+function planGeo(pts, th) {
+  const sh = new THREE.Shape(pts.map(q => new THREE.Vector2(q[0], -q[1])));
+  const g = new THREE.ExtrudeGeometry(sh, { depth: th, bevelEnabled: false });
+  g.rotateX(-R90); g.translate(0, -th / 2, 0); return g;
+}
+const GEO = {
+  sph: (r, w = 8, h = 6) => new THREE.SphereGeometry(r, w, h),
+  box: (x, y, z) => new THREE.BoxGeometry(x, y, z),
+  cone: (r, h, n = 5) => new THREE.ConeGeometry(r, h, n),
+  cyl: (a, b, h, n = 5) => new THREE.CylinderGeometry(a, b, h, n),
+  tor: (r, t) => new THREE.TorusGeometry(r, t, 5, 14),
+};
+function makeBirdCtx(info) {
+  const rc = BALANCE.rarities[info.rarity].color, g = new THREE.Group(), root = new THREE.Group(); g.add(root);
+  const mats = [], cache = {};
+  const c = {
+    g, root, mats, info, rc, wingPivots: [], wingInfo: [], scale: 1, legLen: 0.3, bodyY: 0.6, bodyW: 0.9, bodyL: 1.17,
+    bs: { sx: 1, sy: 0.85, sz: 1.3 }, headGroup: null, headZ: 0.85, headR: 0.55, bodyMesh: null,
+    m(color) {   // damage-flash / fade-capable material, cached per colour
+      if (!cache[color]) { cache[color] = new THREE.MeshLambertMaterial({ color, emissive: rc, emissiveIntensity: EMIS }); mats.push(cache[color]); }
+      return cache[color];
+    },
+    fx(color, opacity = 1) { return new THREE.MeshBasicMaterial({ color, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 }); },
+    add(parent, geo, mat, o = {}) {
+      const m = new THREE.Mesh(geo, mat);
+      if (o.p) m.position.set(o.p[0], o.p[1], o.p[2]);
+      if (o.r) m.rotation.set(o.r[0], o.r[1], o.r[2]);
+      if (o.s) m.scale.set(o.s[0], o.s[1], o.s[2]);
+      if (o.shadow) m.castShadow = true;
+      parent.add(m); return m;
+    },
+    limb(parent, a, b, r1, r2, mat, seg = 5) {   // tapered cylinder from point a (radius r1) to point b (radius r2)
+      const A = new THREE.Vector3(a[0], a[1], a[2]), B = new THREE.Vector3(b[0], b[1], b[2]), d = B.clone().sub(A), len = d.length();
+      const m = new THREE.Mesh(GEO.cyl(r2, r1, len, seg), mat);
+      m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+      parent.add(m); return m;
+    },
+    surf(x, z) {   // height of the torso surface at (x, z): for placing markings on the back
+      const b = c.bs, q = 1 - (x / (0.9 * b.sx)) ** 2 - (z / (0.9 * b.sz)) ** 2;
+      return c.bodyY + 0.9 * b.sy * Math.sqrt(Math.max(0.02, q));
+    },
+    torso(o) {   // size [x,y,z], lift (leg length), col, belly (underside colour), chest (front-of-chest colour)
+      const sz = o.size || [1, 0.85, 1.3];
+      c.legLen = o.lift ?? 0.3; c.bs = { sx: sz[0], sy: sz[1], sz: sz[2] }; c.bodyW = 0.9 * sz[0]; c.bodyL = 0.9 * sz[2];
+      c.bodyY = c.legLen + 0.9 * sz[1] - 0.05;
+      const geo = GEO.sph(0.9, 12, 9); let mat;
+      if (o.belly !== undefined || o.chest !== undefined) {
+        const pos = geo.attributes.position, col = new Float32Array(pos.count * 3), base = new THREE.Color(o.col), bel = new THREE.Color(o.belly ?? o.col), ch = new THREE.Color(o.chest ?? o.col), tmp = new THREE.Color();
+        for (let i = 0; i < pos.count; i++) {
+          const ny = pos.getY(i) / 0.9, nz = pos.getZ(i) / 0.9;
+          const tb = Math.min(1, Math.max(0, (-ny - 0.05) / 0.4)), tc = Math.min(1, Math.max(0, (nz - 0.25) / 0.3)) * Math.min(1, Math.max(0, (ny + 0.5) / 0.5));
+          tmp.copy(base).lerp(bel, tb).lerp(ch, tc); col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        mat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, emissive: rc, emissiveIntensity: EMIS }); mats.push(mat);
+      } else mat = c.m(o.col);
+      c.bodyMesh = c.add(root, geo, mat, { p: [0, c.bodyY, 0], s: sz, shadow: true });
+      return c.bodyMesh;
+    },
+    head(o) {   // r, y, z, col, hs (scale), beak {type,len,w,col,tip,y}, eye {r,col,ring} or eye:false
+      const h = new THREE.Group(); h.position.set(0, o.y, o.z); root.add(h);
+      const r = o.r ?? 0.55;
+      c.add(h, GEO.sph(r, 9, 7), c.m(o.col), { s: o.hs, shadow: true });
+      if (o.eye !== false) {
+        const e = o.eye || {}, er = e.r ?? 0.1;
+        for (const s of [-1, 1]) {
+          if (e.ring !== undefined) c.add(h, GEO.sph(er * 1.55, 6, 4), c.m(e.ring), { p: [s * r * 0.5, r * 0.24, r * 0.7], s: [1, 1, 0.6] });
+          c.add(h, GEO.sph(er, 6, 4), e.col !== undefined ? c.fx(e.col) : MAT.eye, { p: [s * r * 0.52, r * 0.24, r * 0.78] });
+        }
+      }
+      if (o.beak) c.beak(h, r, o.beak);
+      c.headGroup = h; c.headZ = o.z; c.headR = r;
+      return h;
+    },
+    beak(h, r, b) {
+      const col = c.m(b.col ?? 0xffa62b), len = b.len ?? 0.5, w = b.w ?? 0.2, y0 = b.y ?? -r * 0.1, z0 = r * 0.72;
+      switch (b.type ?? 'cone') {
+        case 'hook':   // raptors, parrots: heavy base plus a down-curved tip
+          c.add(h, GEO.cone(w * 1.15, len * 0.8, 5), col, { p: [0, y0, z0 + len * 0.4], r: [R90, 0, 0], s: [1, 1, 1.2] });
+          c.add(h, GEO.cone(w * 0.55, len * 0.5, 5), c.m(b.tip ?? b.col ?? 0x333333), { p: [0, y0 - len * 0.16, z0 + len * 0.82], r: [R90 + 0.75, 0, 0] });
+          break;
+        case 'long': c.add(h, GEO.cone(w, len, 4), col, { p: [0, y0, z0 + len / 2], r: [R90, 0, 0] }); break;
+        case 'big':    // toucan / hornbill bill: tall, slightly narrow, optional contrasting tip
+          c.add(h, GEO.cone(w, len, 6), col, { p: [0, y0 + w * 0.25, z0 + len / 2], r: [R90, 0, 0], s: [0.8, 1, 1.15] });
+          if (b.tip !== undefined) c.add(h, GEO.cone(w * 0.3, len * 0.3, 6), c.m(b.tip), { p: [0, y0 + w * 0.25, z0 + len * 0.86], r: [R90, 0, 0], s: [0.9, 1, 1.1] });
+          break;
+        case 'bent':   // flamingo: straight base, sharply down-bent black tip
+          c.add(h, GEO.cone(w, len * 0.6, 5), col, { p: [0, y0, z0 + len * 0.3], r: [R90, 0, 0] });
+          c.add(h, GEO.cone(w * 0.8, len * 0.55, 5), c.m(b.tip ?? 0x222222), { p: [0, y0 - len * 0.2, z0 + len * 0.68], r: [R90 + 0.95, 0, 0] });
+          break;
+        default: c.add(h, GEO.cone(w, len, 5), col, { p: [0, y0, z0 + len / 2], r: [R90, 0, 0] });
+      }
+    },
+    wings(o = {}) {   // span, chord, split, col, tip, fingers, sweep (tips back), bend (tips up), taper (tip chord ratio), fingerFx
+      const span = o.span ?? 2.9, chord = o.chord ?? 1, split = o.split ?? 0.6, th = o.thick ?? 0.12, taper = o.taper ?? 0.6;
+      const inner = span * split, outer = span - inner, col = c.m(o.col), tipc = c.m(o.tip ?? o.col), nf = o.fingers ?? 0;
+      const cm = chord * 0.88, ct = chord * taper, lb0 = (chord - cm) * 0.3, lb1 = (cm - ct) * 0.3;   // chord at the elbow / tip, leading-edge set-back
+      for (const s of [-1, 1]) {
+        const p = new THREE.Group(); p.position.set(s * c.bodyW * 0.6, o.y ?? c.bodyY + c.bs.sy * 0.28, o.z ?? 0.1); c.root.add(p);
+        const seg = (len, c0, c1, lb) => planGeo([[0, c0 / 2], [s * len, c0 / 2 - lb], [s * len, c0 / 2 - lb - c1], [0, -c0 / 2]], th);
+        c.add(p, seg(inner, chord, cm, lb0), col, { shadow: true });
+        const og = new THREE.Group(); og.position.set(s * inner, 0, chord / 2 - lb0 - cm / 2); og.rotation.set(0, s * (o.sweep ?? 0), s * (o.bend ?? 0)); p.add(og);
+        c.add(og, seg(outer, cm, ct, lb1), tipc);
+        for (let i = 0; i < nf; i++) {
+          const k = i - (nf - 1) / 2, f = new THREE.Group(); f.position.set(s * outer * 0.7, 0, -ct * 0.1 + k * cm * 0.17); f.rotation.y = -s * k * 0.22; og.add(f);
+          c.add(f, GEO.box(outer * 0.6, 0.05, cm * 0.2), o.fingerFx !== undefined ? c.fx(o.fingerFx) : tipc, { p: [s * outer * 0.3, 0, 0] });
+        }
+        c.wingPivots.push(p); c.wingInfo.push({ p, s, inner, outer, chord });
+      }
+    },
+    tail(o = {}) {   // type box|wedge|fan|fork, len, w, col, tip, pitch (up), n
+      const L = o.len ?? 0.9, w = o.w ?? 0.6, col = c.m(o.col ?? 0x555555), tipc = o.tip !== undefined ? c.m(o.tip) : col;
+      const t = new THREE.Group(); t.position.set(0, c.bodyY + (o.y ?? 0.05), -c.bodyL * 0.85); t.rotation.x = o.pitch ?? 0.25; c.root.add(t);
+      switch (o.type ?? 'box') {
+        case 'wedge': c.add(t, GEO.cone(w * 0.5, L, 4), col, { p: [0, 0, -L / 2], r: [-R90, 0, 0], s: [1, 1, 0.22] }); break;
+        case 'fan': {
+          const n = o.n ?? 5;
+          for (let i = 0; i < n; i++) { const a = (i - (n - 1) / 2) * (o.spread ?? 0.16), f = new THREE.Group(); f.rotation.y = a; t.add(f); c.add(f, GEO.box(w / n * 1.6, 0.08, L), i % 2 ? col : tipc, { p: [0, 0, -L / 2] }); }
+          break;
+        }
+        case 'fork': for (const s of [-1, 1]) { const f = new THREE.Group(); f.rotation.y = s * (o.spread ?? 0.22); t.add(f); c.add(f, GEO.box(w * 0.5, 0.1, L), col, { p: [s * w * 0.15, 0, -L / 2] }); } break;
+        default: {
+          const wf = (f) => w * (0.62 + 0.38 * f);   // half-open fan: width at fraction f of the length
+          const band = (f0, f1) => planGeo([[-wf(f0) / 2, -L * f0], [wf(f0) / 2, -L * f0], [wf(f1) / 2, -L * f1], [-wf(f1) / 2, -L * f1]], 0.12);
+          if (o.tip !== undefined) { c.add(t, band(0, 0.78), col); c.add(t, band(0.78, 1), tipc); } else c.add(t, band(0, 1), col);
+        }
+      }
+      return t;
+    },
+    legs(o = {}) {   // col, thick, foot (toe scale), fluff (feathered feet radius)
+      const lift = c.legLen, col = c.m(o.col ?? 0x8a6d4a), th = o.thick ?? 0.07, ft = o.foot ?? 1;
+      for (const s of [-1, 1]) {
+        const x = s * c.bodyW * 0.38;
+        c.limb(c.root, [x, lift + 0.25, 0.05], [x, 0.03, 0.12], th * 1.15, th * 0.85, col);
+        for (let i = -1; i <= 1; i++) c.add(c.root, GEO.cone(th * 0.9 * ft, 0.32 * ft, 4), col, { p: [x + i * 0.09 * ft, 0.05, 0.12 + 0.17 * ft], r: [R90, 0, i * 0.25] });
+        if (o.fluff) c.add(c.root, GEO.sph(o.fluff, 7, 5), c.m(o.fluffCol ?? o.col ?? 0xffffff), { p: [x, lift * 0.4 + 0.12, 0.1], s: [0.85, 1.1, 1.05] });
+      }
+    },
+    speckle(n, col, r, seed, zMin = -0.8, zMax = 0.55) {   // small dots scattered over the back
+      const mat = c.m(col);
+      for (let i = 0; i < n; i++) {
+        const x = (hash2(i, seed) - 0.5) * 1.3 * c.bs.sx, z = zMin + hash2(seed, i + 7) * (zMax - zMin) * c.bs.sz;
+        c.add(c.root, GEO.sph(r, 5, 4), mat, { p: [x, c.surf(x, z), z], s: [1, 0.35, 1] });
+      }
+    },
+  };
+  return c;
+}
+
+const SPECIES = {
+  // ------------------------------------------------------------------ common
+  sparrow(c) {
+    c.scale = 0.85; const brown = 0x8b6b4a, dark = 0x5a3d26;
+    c.torso({ size: [1, 0.9, 1.15], lift: 0.26, col: brown, belly: 0xe3d6bd });
+    c.wings({ span: 2.3, chord: 0.9, col: brown, tip: dark });
+    c.tail({ len: 0.9, w: 0.6, col: dark }); c.legs({ col: 0xc98f7a });
+    const h = c.head({ r: 0.55, y: c.bodyY + 0.78, z: 0.8, col: 0xa08a70, beak: { len: 0.38, w: 0.2, col: 0x6b5d4a } });
+    c.add(h, GEO.sph(0.57, 8, 6), c.m(0x7a4a2c), { p: [0, 0.14, -0.08], s: [0.98, 0.55, 0.95] });   // chestnut cap
+    c.add(h, GEO.sph(0.2, 6, 4), c.m(0x2b2b2b), { p: [0, -0.3, 0.4], s: [1.1, 0.8, 0.7] });          // black bib
+    for (let i = -1; i <= 1; i++) c.add(c.root, GEO.box(0.08, 0.05, 0.55), c.m(dark), { p: [i * 0.28, c.surf(i * 0.28, -0.15), -0.15] });   // back streaks
+  },
+  pigeon(c) {
+    c.scale = 1; const grey = 0x8d93a8, dark = 0x4f566b;
+    c.torso({ size: [1.05, 0.95, 1.2], lift: 0.3, col: grey, belly: 0xb8bdd0 });
+    c.wings({ span: 2.8, chord: 1, col: grey, tip: dark });
+    for (const w of c.wingInfo) { c.add(w.p, GEO.box(w.inner * 0.9, 0.12, 0.09), c.m(dark), { p: [w.s * w.inner * 0.5, 0, 0.12] }); c.add(w.p, GEO.box(w.inner * 0.9, 0.12, 0.09), c.m(dark), { p: [w.s * w.inner * 0.5, 0, -0.18] }); }   // two wing bars
+    c.tail({ len: 1.0, w: 0.7, col: 0x6a718a, tip: dark }); c.legs({ col: 0xd9738a });
+    const h = c.head({ r: 0.46, y: c.bodyY + 0.82, z: 0.88, col: 0x6f7790, eye: { r: 0.09, col: 0xff8a2a }, beak: { len: 0.4, w: 0.15, col: 0x3a3a3a } });
+    c.add(h, GEO.sph(0.5, 8, 6), c.m(0x4aa57a), { p: [0, -0.34, -0.08], s: [1.05, 0.5, 1] });         // iridescent neck
+    c.add(h, GEO.sph(0.4, 8, 6), c.m(0x8a5ab0), { p: [0, -0.46, -0.1], s: [1, 0.35, 0.95] });
+    c.add(h, GEO.sph(0.12, 6, 4), c.m(0xf4f4f4), { p: [0, 0.03, 0.46] });                              // white cere
+  },
+  robin(c) {
+    c.scale = 0.9; const brown = 0x8a6a4a, orange = 0xe0653a;
+    c.torso({ size: [1.05, 0.95, 1.1], lift: 0.28, col: brown, belly: 0xf1e8d8, chest: orange });   // round orange breast
+    c.wings({ span: 2.4, chord: 0.9, col: brown, tip: 0x6a4e34 });
+    c.tail({ len: 1.0, w: 0.5, col: 0x6e5238, pitch: 0.6 }); c.legs({ col: 0x6b4a3a, thick: 0.05 });
+    const h = c.head({ r: 0.55, y: c.bodyY + 0.78, z: 0.78, col: brown, eye: { r: 0.12 }, beak: { len: 0.4, w: 0.09, col: 0x2a2a2a } });
+    c.add(h, GEO.sph(0.5, 8, 6), c.m(orange), { p: [0, -0.08, 0.2], s: [0.95, 0.8, 0.7] });            // orange face
+  },
+  starling(c) {
+    c.scale = 0.9; const black = 0x2f3b4a;
+    c.torso({ size: [0.95, 0.85, 1.25], lift: 0.28, col: black });
+    c.speckle(14, 0xe6dccb, 0.07, 3);
+    c.wings({ span: 2.7, chord: 0.8, col: black, tip: 0x2e6b62, sweep: 0.2, taper: 0.4 });
+    c.tail({ len: 0.7, w: 0.6, col: 0x1f2833 }); c.legs({ col: 0xc0603a });
+    c.head({ r: 0.5, y: c.bodyY + 0.7, z: 0.9, col: 0x233342, hs: [0.9, 0.9, 1.2], beak: { type: 'long', len: 0.7, w: 0.12, col: 0xe8d44a } });
+  },
+  wren(c) {
+    c.scale = 0.75; const brown = 0x9c7a55, dark = 0x6a4e34;
+    c.torso({ size: [1.05, 1.0, 1.0], lift: 0.24, col: brown, belly: 0xd8c4a0 });
+    c.wings({ span: 2.1, chord: 0.9, col: brown, tip: dark, taper: 0.8 });
+    for (const w of c.wingInfo) for (let i = 0; i < 3; i++) c.add(w.p, GEO.box(0.05, 0.12, 0.7), c.m(dark), { p: [w.s * (0.3 + i * 0.28), 0, -0.05] });   // wing barring
+    c.tail({ len: 0.95, w: 0.5, col: 0x7a5a3c, tip: dark, pitch: 1.25 });                                                // cocked up
+    c.legs({ col: 0xb08a6a, thick: 0.05 });
+    const h = c.head({ r: 0.5, y: c.bodyY + 0.78, z: 0.78, col: brown, eye: { r: 0.11 }, beak: { type: 'long', len: 0.62, w: 0.075, col: 0x5a4630, y: -0.04 } });
+    for (const s of [-1, 1]) c.add(h, GEO.box(0.28, 0.06, 0.34), c.m(0xefe2c4), { p: [s * 0.26, 0.2, 0.3], r: [0, s * -0.4, 0] });   // pale eyebrow
+  },
+  finch(c) {
+    c.scale = 0.85; const brown = 0x9c6a4a, red = 0xd0404a;
+    c.torso({ size: [1, 0.92, 1.15], lift: 0.27, col: brown, belly: 0xe8d9c0, chest: red });   // red breast
+    c.wings({ span: 2.4, chord: 0.9, col: 0x6b4630, tip: 0x3a2a20 });
+    for (const w of c.wingInfo) c.add(w.p, GEO.box(w.inner * 0.8, 0.12, 0.07), c.m(0xe8d9c0), { p: [w.s * w.inner * 0.45, 0, 0.1] });
+    c.tail({ type: 'fork', len: 1.0, w: 0.65, col: 0x5a3d2c }); c.legs({ col: 0x8a6a5a });
+    const h = c.head({ r: 0.55, y: c.bodyY + 0.78, z: 0.8, col: brown, beak: { len: 0.34, w: 0.3, col: 0xe5cfa5 } });
+    c.add(h, GEO.sph(0.5, 8, 6), c.m(red), { p: [0, 0.02, 0.18], s: [0.95, 0.85, 0.7] });                          // red face
+  },
+  // ------------------------------------------------------------------ rare
+  blueJay(c) {
+    c.scale = 1; const blue = 0x3b82f6, black = 0x1b1f33, white = 0xf1f5ff;
+    c.torso({ size: [1, 0.92, 1.25], lift: 0.3, col: blue, belly: white });
+    c.wings({ span: 2.9, chord: 1, col: blue, tip: 0x1f3f9a });
+    for (const w of c.wingInfo) { c.add(w.p, GEO.box(0.22, 0.12, 0.22), c.m(white), { p: [w.s * (w.inner + 0.35), 0, 0.15] }); c.add(w.p, GEO.box(0.22, 0.12, 0.22), c.m(white), { p: [w.s * (w.inner + 0.7), 0, 0.15] }); c.add(w.p, GEO.box(0.08, 0.12, 0.9), c.m(black), { p: [w.s * (w.inner * 0.45), 0, 0] }); }
+    c.tail({ len: 1.6, w: 0.62, col: blue, tip: white, pitch: 0.2 }); c.legs({ col: 0x2a2a2a });
+    const h = c.head({ r: 0.6, y: c.bodyY + 0.8, z: 0.85, col: blue, eye: { r: 0.1 }, beak: { len: 0.55, w: 0.2, col: 0x1b1f33 } });
+    c.add(h, GEO.cone(0.3, 0.95, 5), c.m(0x2f6fe0), { p: [0, 0.62, -0.18], r: [-0.45, 0, 0] });                       // crest
+    c.add(h, GEO.sph(0.45, 8, 6), c.m(white), { p: [0, -0.1, 0.22], s: [0.95, 0.8, 0.6] });                            // white face
+    c.add(h, GEO.tor(0.46, 0.07), c.m(black), { p: [0, -0.4, -0.04], r: [R90, 0, 0] });                                // black necklace
+  },
+  cardinal(c) {
+    c.scale = 0.95; const red = 0xd7263d, dark = 0xa01a2d;
+    c.torso({ size: [0.98, 0.9, 1.2], lift: 0.28, col: red });
+    c.wings({ span: 2.5, chord: 0.95, col: dark, tip: 0x7a1424 });
+    c.tail({ len: 1.4, w: 0.5, col: dark }); c.legs({ col: 0x8a5a4a });
+    const h = c.head({ r: 0.56, y: c.bodyY + 0.8, z: 0.82, col: red, beak: { len: 0.44, w: 0.3, col: 0xff8a3d } });
+    c.add(h, GEO.cone(0.27, 0.85, 5), c.m(red), { p: [0, 0.6, -0.12], r: [-0.4, 0, 0] });                              // pointed crest
+    c.add(h, GEO.sph(0.4, 8, 6), c.m(0x1a1a1a), { p: [0, -0.06, 0.3], s: [0.85, 0.65, 0.5] });                         // black mask
+  },
+  kingfisher(c) {
+    c.scale = 0.9; const blue = 0x2a8fd9;
+    c.torso({ size: [0.92, 0.85, 1.0], lift: 0.2, col: blue, belly: 0xf08a30 });
+    c.wings({ span: 2.1, chord: 0.8, col: 0x2278b8, tip: 0x185a8e, taper: 0.8 });
+    c.tail({ len: 0.4, w: 0.45, col: 0x2278b8, pitch: 0.1 }); c.legs({ col: 0xd04a3a, thick: 0.06, foot: 0.7 });
+    const h = c.head({ r: 0.72, y: c.bodyY + 0.62, z: 0.7, col: blue, eye: { r: 0.1 }, beak: { type: 'long', len: 1.7, w: 0.17, col: 0x1a1a1a, y: -0.1 } });
+    for (const s of [-1, 1]) c.add(h, GEO.sph(0.2, 6, 5), c.m(0xf08a30), { p: [s * 0.5, -0.02, 0.34], s: [0.5, 1, 1.2] });   // orange cheek patch
+    c.add(h, GEO.sph(0.26, 6, 5), c.m(0xf8f8f8), { p: [0, -0.36, 0.44], s: [1.2, 0.8, 0.7] });                             // white throat
+  },
+  magpie(c) {
+    c.scale = 1.05; const black = 0x1e1e2a, sheen = 0x1d6b7a;
+    c.torso({ size: [0.98, 0.9, 1.3], lift: 0.32, col: black, belly: 0xf6f6f6 });
+    c.wings({ span: 2.9, chord: 1, col: black, tip: sheen, taper: 0.8 });
+    for (const w of c.wingInfo) c.add(w.p, GEO.box(w.inner * 0.55, 0.13, 0.7), c.m(0xf6f6f6), { p: [w.s * w.inner * 0.32, 0, -0.05] });   // white shoulders
+    c.tail({ len: 2.3, w: 0.42, col: 0x16202e, tip: sheen, pitch: 0.12 }); c.legs({ col: 0x151515 });
+    c.head({ r: 0.55, y: c.bodyY + 0.82, z: 0.9, col: black, eye: { r: 0.1 }, beak: { len: 0.6, w: 0.24, col: 0x111111 } });
+  },
+  woodpecker(c) {
+    c.scale = 1; const black = 0x24242a;
+    c.torso({ size: [0.9, 0.9, 1.25], lift: 0.3, col: black, belly: 0xe8e0d0 });
+    c.wings({ span: 2.7, chord: 0.95, col: black, tip: 0x15151a });
+    for (const w of c.wingInfo) for (let i = 0; i < 4; i++) c.add(w.p, GEO.box(0.16, 0.12, 0.14), c.m(0xf6f6f0), { p: [w.s * (0.3 + i * 0.4), 0, (i % 2) * 0.22 - 0.1] });   // white spots
+    c.tail({ len: 1.1, w: 0.36, col: black, pitch: 0.05 }); c.legs({ col: 0x5a5a5a, foot: 1.2 });
+    const h = c.head({ r: 0.55, y: c.bodyY + 0.8, z: 0.85, col: 0xf2eee4, eye: { r: 0.1 }, beak: { type: 'long', len: 0.85, w: 0.17, col: 0x3a3a3a } });
+    c.add(h, GEO.sph(0.56, 8, 6), c.m(0xd7263d), { p: [0, 0.16, -0.12], s: [0.98, 0.55, 0.92] });                            // red cap
+    for (const s of [-1, 1]) c.add(h, GEO.box(0.08, 0.1, 0.55), c.m(0x1a1a1a), { p: [s * 0.46, -0.12, 0.1] });                // dark cheek stripe
+  },
+  // ------------------------------------------------------------------ super rare
+  barnOwl(c) {
+    c.scale = 1.1; const tan = 0xd8b88a, white = 0xf6efe0;
+    c.torso({ size: [1.05, 1.0, 1.15], lift: 0.45, col: tan, belly: white });
+    c.wings({ span: 3.1, chord: 1.1, col: tan, tip: 0x9a7a52, fingers: 3, taper: 0.8 });
+    c.tail({ len: 0.6, w: 0.7, col: 0xe3cfa5, pitch: 0.1 });
+    c.legs({ col: white, thick: 0.15, fluff: 0.2, foot: 1.1 });
+    const h = c.head({ r: 0.75, y: c.bodyY + 0.78, z: 0.8, col: white, eye: false, beak: { type: 'hook', len: 0.3, w: 0.1, col: 0xe9d5a8, y: -0.18 } });
+    for (const s of [-1, 1]) {   // heart-shaped face: two discs with a dark rim and eyes
+      c.add(h, GEO.sph(0.5, 9, 7), c.m(0xb89868), { p: [s * 0.3, 0.04, 0.46], s: [1.04, 1.12, 0.36] });
+      c.add(h, GEO.sph(0.5, 9, 7), c.m(white), { p: [s * 0.3, 0.04, 0.5], s: [0.95, 1.03, 0.34] });
+      c.add(h, GEO.sph(0.1, 6, 4), MAT.eye, { p: [s * 0.3, 0.12, 0.74] });
+    }
+  },
+  raven(c) {
+    c.scale = 1.15; const black = 0x15151d, sheen = 0x2a2a3d;
+    c.torso({ size: [1, 0.95, 1.3], lift: 0.34, col: black });
+    c.wings({ span: 3.4, chord: 1.0, col: black, tip: sheen, fingers: 4, taper: 0.8 });
+    c.tail({ type: 'wedge', len: 1.6, w: 1.0, col: black, pitch: 0.2 }); c.legs({ col: 0x111116, thick: 0.09, foot: 1.2 });
+    const h = c.head({ r: 0.58, y: c.bodyY + 0.8, z: 0.9, col: black, eye: { r: 0.1 }, beak: { type: 'hook', len: 0.8, w: 0.3, col: 0x2a2a35, tip: 0x15151d } });
+    for (let i = -1; i <= 1; i++) c.add(h, GEO.cone(0.12, 0.45, 4), c.m(black), { p: [i * 0.2, -0.5, 0.15], r: [Math.PI - 0.3, 0, i * 0.2] });   // shaggy throat
+  },
+  toucan(c) {
+    c.scale = 1.1;
+    c.torso({ size: [0.95, 0.95, 1.15], lift: 0.3, col: 0x1a1a1a, chest: 0xf8f0d0 });   // white bib
+    c.add(c.root, GEO.sph(0.3, 7, 5), c.m(0xe03a2a), { p: [0, c.bodyY - 0.35, -c.bodyL * 0.85], s: [1.2, 0.8, 1] });       // red undertail
+    c.wings({ span: 2.4, chord: 0.95, col: 0x1a1a1a, tip: 0x111111 });
+    c.tail({ len: 1.1, w: 0.55, col: 0x1a1a1a }); c.legs({ col: 0x6a8aa8 });
+    c.head({ r: 0.55, y: c.bodyY + 0.7, z: 0.8, col: 0x1a1a1a, eye: { r: 0.1, ring: 0x38bdf8 }, beak: { type: 'big', len: 2.0, w: 0.46, col: 0xff9f1c, tip: 0x222222, y: -0.02 } });
+  },
+  flamingo(c) {
+    c.scale = 1.2; const pink = 0xf07aa8;
+    c.torso({ size: [0.85, 0.8, 1.2], lift: 1.5, col: pink, belly: 0xf8a5c4 });
+    c.legs({ col: 0xe8688c, thick: 0.065, foot: 1.3 });
+    c.wings({ span: 3.2, chord: 1.0, col: pink, tip: 0x15151a, taper: 0.8 });
+    c.tail({ len: 0.7, w: 0.55, col: 0xf8a5c4, pitch: 0.2 });
+    const nm = c.m(0xf8a5c4), by = c.bodyY;                                                                                  // S-curved neck
+    c.limb(c.root, [0, by + 0.3, c.bodyL * 0.55], [0, by + 1.2, c.bodyL * 0.35], 0.2, 0.13, nm, 6);
+    c.limb(c.root, [0, by + 1.2, c.bodyL * 0.35], [0, by + 2.1, c.bodyL * 0.75], 0.13, 0.12, nm, 6);
+    c.head({ r: 0.32, y: by + 2.2, z: c.bodyL * 0.8, col: 0xf8a5c4, eye: { r: 0.07 }, beak: { type: 'bent', len: 0.7, w: 0.12, col: 0xf8d0dc, tip: 0x111111 } });
+  },
+  macaw(c) {
+    c.scale = 1.15; const red = 0xe63946, blue = 0x2563eb, yellow = 0xffd23f;
+    c.torso({ size: [0.95, 0.95, 1.2], lift: 0.32, col: red });
+    c.wings({ span: 3.0, chord: 1.0, col: red, tip: blue, taper: 0.8 });
+    for (const w of c.wingInfo) c.add(w.p, GEO.box(0.55, 0.13, 0.9), c.m(yellow), { p: [w.s * w.inner * 0.9, 0, 0] });      // yellow band
+    c.tail({ type: 'fan', n: 3, len: 2.5, w: 0.6, col: red, tip: blue, spread: 0.09, pitch: 0.2 }); c.legs({ col: 0x4a4a4a, foot: 1.1 });
+    const h = c.head({ r: 0.6, y: c.bodyY + 0.8, z: 0.85, col: red, eye: { r: 0.1 }, beak: { type: 'hook', len: 0.75, w: 0.33, col: 0xf2eedc, tip: 0x222222 } });
+    c.add(h, GEO.sph(0.46, 8, 6), c.m(0xf4f4f4), { p: [0, -0.04, 0.28], s: [0.9, 0.8, 0.55] });                             // white face patch
+  },
+  // ------------------------------------------------------------------ epic
+  peregrine(c) {
+    c.scale = 1.05; const slate = 0x4a5a6b;
+    c.torso({ size: [0.95, 0.85, 1.25], lift: 0.3, col: slate, belly: 0xf1f1ec });
+    for (let i = 0; i < 3; i++) c.add(c.root, GEO.box(0.9, 0.05, 0.08), c.m(0x3a4552), { p: [0, c.bodyY - 0.55 + i * 0.0, 0.2 + i * 0.28 - 0.35], s: [1, 1, 1] });   // belly barring
+    c.wings({ span: 3.3, chord: 0.8, col: slate, tip: 0x1f2733, sweep: 0.38, taper: 0.35 });
+    c.tail({ len: 1.2, w: 0.55, col: slate, tip: 0x1f2733 }); c.legs({ col: 0xf2c14e, thick: 0.09, foot: 1.2 });
+    const h = c.head({ r: 0.55, y: c.bodyY + 0.72, z: 0.85, col: 0x252f3b, eye: { r: 0.1, ring: 0xf2c14e }, beak: { type: 'hook', len: 0.38, w: 0.16, col: 0x3a3a3a, tip: 0x222222 } });
+    c.add(h, GEO.sph(0.4, 8, 6), c.m(0xf1f1ec), { p: [0, -0.26, 0.2], s: [0.95, 0.55, 0.65] });                              // white cheek
+    for (const s of [-1, 1]) c.add(h, GEO.box(0.08, 0.3, 0.12), c.m(0x1a222c), { p: [s * 0.3, -0.18, 0.4] });               // moustache stripe
+    c.add(h, GEO.sph(0.12, 6, 4), c.m(0xf2c14e), { p: [0, -0.02, 0.5] });                                                    // cere
+  },
+  snowyOwl(c) {
+    c.scale = 1.2; const white = 0xf2f2f2;
+    c.torso({ size: [1.1, 1.05, 1.2], lift: 0.5, col: white });
+    c.speckle(16, 0x3a3a3a, 0.09, 11, -0.9, 0.3);
+    c.wings({ span: 3.2, chord: 1.1, col: white, tip: 0xe0e0e0, fingers: 3, taper: 0.8 });
+    for (const w of c.wingInfo) for (let i = 0; i < 3; i++) c.add(w.p, GEO.box(0.14, 0.12, 0.14), c.m(0x3a3a3a), { p: [w.s * (0.5 + i * 0.6), 0, (i % 2) * 0.3 - 0.15] });
+    c.tail({ len: 0.8, w: 0.75, col: white, pitch: 0.1 });
+    c.legs({ col: white, thick: 0.2, fluff: 0.3, foot: 1.3 });
+    c.head({ r: 0.72, y: c.bodyY + 0.8, z: 0.82, col: white, eye: { r: 0.17, col: 0xffd23f }, beak: { type: 'hook', len: 0.26, w: 0.1, col: 0x1a1a1a, y: -0.2 } });
+  },
+  hornbill(c) {
+    c.scale = 1.2; const black = 0x222222, yellow = 0xf2c14e;
+    c.torso({ size: [1, 0.95, 1.3], lift: 0.34, col: black, belly: 0xf5f5f0 });
+    c.wings({ span: 3.2, chord: 1.0, col: black, tip: 0xf5f5f0, fingers: 3, taper: 0.8 });
+    c.tail({ type: 'box', len: 1.9, w: 0.6, col: 0xf5f5f0, tip: black, pitch: 0.15 }); c.legs({ col: 0x6a6a6a });
+    const h = c.head({ r: 0.55, y: c.bodyY + 0.78, z: 0.88, col: black, eye: { r: 0.1, ring: 0xd9a0a0 }, beak: { type: 'hook', len: 1.35, w: 0.36, col: yellow, tip: 0xe0902a } });
+    c.add(h, GEO.sph(0.42, 8, 6), c.m(0xffb02e), { p: [0, 0.4, 0.95], s: [0.75, 0.75, 1.7] });                               // casque on the bill
+  },
+  osprey(c) {
+    c.scale = 1.15; const brown = 0x6b5a48, dark = 0x2f2418;
+    c.torso({ size: [0.95, 0.85, 1.3], lift: 0.32, col: brown, belly: 0xf6f6f2 });
+    c.wings({ span: 3.7, chord: 0.85, col: brown, tip: dark, bend: 0.32, sweep: 0.12, fingers: 3, taper: 0.5 });
+    c.tail({ len: 1.2, w: 0.6, col: brown, tip: 0xdcd2c0 }); c.legs({ col: 0xd8d0c0, thick: 0.1, foot: 1.6 });
+    const h = c.head({ r: 0.56, y: c.bodyY + 0.75, z: 0.88, col: 0xf6f6f2, eye: { r: 0.1, col: 0xf2c14e }, beak: { type: 'hook', len: 0.42, w: 0.17, col: 0x1a1a1a } });
+    for (const s of [-1, 1]) c.add(h, GEO.sph(0.4, 7, 5), c.m(dark), { p: [s * 0.3, 0.1, 0.25], s: [0.4, 0.4, 1.2] });         // dark eye stripe
+  },
+  goldenEagle(c) {
+    c.scale = 1.25; const brown = 0x6a4a2a, gold = 0xc9962f;
+    c.torso({ size: [1.05, 0.95, 1.35], lift: 0.36, col: brown });
+    c.wings({ span: 3.9, chord: 1.3, col: brown, tip: 0x3a2814, fingers: 5, taper: 0.8 });
+    c.tail({ len: 1.5, w: 0.85, col: brown, tip: 0x3a2814 }); c.legs({ col: gold, thick: 0.17, fluff: 0.2, foot: 1.5 });
+    const h = c.head({ r: 0.6, y: c.bodyY + 0.78, z: 0.92, col: 0x7a5a30, eye: { r: 0.1, col: 0x2a1a0a }, beak: { type: 'hook', len: 0.62, w: 0.25, col: 0xf2c14e, tip: 0x2a2a2a } });
+    c.add(h, GEO.sph(0.52, 8, 6), c.m(gold), { p: [0, 0.12, -0.28], s: [0.95, 0.85, 0.75] });                                // golden nape
+    for (let i = -1; i <= 1; i++) c.add(h, GEO.cone(0.14, 0.55, 4), c.m(gold), { p: [i * 0.2, 0.05, -0.55], r: [-R90 + 0.2, 0, i * 0.3] });
+    for (const s of [-1, 1]) c.add(h, GEO.box(0.3, 0.07, 0.4), c.m(0x4a3418), { p: [s * 0.3, 0.3, 0.38] });                  // brow ridge
+  },
+  // ------------------------------------------------------------------ mythic
+  baldEagle(c) {
+    c.scale = 1.3; const brown = 0x4a3826;
+    c.torso({ size: [1.05, 0.95, 1.35], lift: 0.36, col: brown });
+    c.wings({ span: 4.0, chord: 1.3, col: brown, tip: 0x2e2218, fingers: 5, taper: 0.8 });
+    c.tail({ len: 1.4, w: 0.9, col: 0xf8f8f6 }); c.legs({ col: 0xf2c14e, thick: 0.15, foot: 1.5 });
+    const h = c.head({ r: 0.62, y: c.bodyY + 0.78, z: 0.92, col: 0xf8f8f6, eye: { r: 0.1, col: 0xf2c14e }, beak: { type: 'hook', len: 0.68, w: 0.27, col: 0xf2c14e, tip: 0xe0a830 } });
+    c.add(h, GEO.sph(0.5, 8, 6), c.m(0xf8f8f6), { p: [0, -0.34, -0.05], s: [1, 0.5, 1] });                                   // white hackles
+    for (const s of [-1, 1]) c.add(h, GEO.box(0.3, 0.07, 0.4), c.m(0xe8e8e2), { p: [s * 0.3, 0.3, 0.4] });                   // brow
+  },
+  condor(c) {
+    c.scale = 1.45; const black = 0x2a2a2a, skin = 0xb89080;
+    c.torso({ size: [1.1, 1.0, 1.4], lift: 0.4, col: black });
+    c.wings({ span: 4.5, chord: 1.5, col: black, tip: 0x1c1c1c, fingers: 6, taper: 0.8 });
+    for (const w of c.wingInfo) c.add(w.p, GEO.box(w.outer * 0.55, 0.12, 0.9), c.m(0xf4f4f0), { p: [w.s * (w.inner + w.outer * 0.38), 0, -0.1] });   // white wing patches
+    c.tail({ len: 1.3, w: 0.8, col: black, pitch: 0.15 }); c.legs({ col: 0x6a6a6a, thick: 0.13, foot: 1.4 });
+    const by = c.bodyY;
+    c.limb(c.root, [0, by + 0.35, c.bodyL * 0.55], [0, by + 0.95, c.bodyL * 0.78], 0.3, 0.2, c.m(skin), 6);                  // bare neck
+    c.add(c.root, GEO.tor(0.55, 0.2), c.m(0xf4f4f0), { p: [0, by + 0.42, c.bodyL * 0.6], r: [R90 - 0.35, 0, 0] });           // white ruff
+    const h = c.head({ r: 0.46, y: by + 1.05, z: c.bodyL * 0.82, col: skin, hs: [0.9, 1, 1.15], eye: { r: 0.08, col: 0x5a2a1a }, beak: { type: 'hook', len: 0.52, w: 0.19, col: 0xdcdcd0, tip: 0xc0c0b0 } });
+    c.add(h, GEO.sph(0.2, 6, 5), c.m(0x5a3a34), { p: [0, 0.3, 0.55], s: [0.45, 1, 1.5] });                                    // comb
+  },
+  harpy(c) {
+    c.scale = 1.3; const grey = 0x6a7a8a, dark = 0x2a2f36;
+    c.torso({ size: [1.05, 1.0, 1.2], lift: 0.38, col: grey, belly: 0xe8e8ee });
+    c.add(c.root, GEO.sph(0.62, 8, 6), c.m(dark), { p: [0, c.bodyY + 0.4, c.bodyL * 0.45], s: [1, 0.45, 0.5] });              // black chest band
+    c.wings({ span: 3.2, chord: 1.5, col: grey, tip: dark, fingers: 4, taper: 0.85 });
+    c.tail({ len: 1.9, w: 0.7, col: grey, tip: dark, pitch: 0.18 }); c.legs({ col: 0xf2c14e, thick: 0.24, foot: 2.0 });
+    const h = c.head({ r: 0.6, y: c.bodyY + 0.8, z: 0.82, col: 0xaab4be, eye: { r: 0.11, col: 0x4a2a1a }, beak: { type: 'hook', len: 0.55, w: 0.27, col: 0x2a2a2a } });
+    for (const s of [-1, 1]) for (let i = 0; i < 3; i++) c.add(h, GEO.cone(0.15, 0.95 - i * 0.12, 4), c.m(dark), { p: [s * (0.16 + i * 0.12), 0.5, -0.2 - i * 0.05], r: [-0.45, 0, -s * (0.1 + i * 0.28)] });   // double crest
+  },
+  // ------------------------------------------------------------------ legendary
+  phoenix(c) {
+    c.scale = 1.35; const flame = 0xff7a1a;
+    c.torso({ size: [1, 0.9, 1.3], lift: 0.34, col: flame, belly: 0xffd23f });
+    c.add(c.root, GEO.sph(1.6, 10, 8), c.fx(0xff9a3a, 0.16), { p: [0, c.bodyY, 0] });                                         // heat glow
+    c.wings({ span: 3.7, chord: 1.2, col: flame, tip: 0xff3b1a, fingers: 5, fingerFx: 0xffc02e, taper: 0.8 });
+    c.legs({ col: 0xffc02e, foot: 1.2 });
+    const fl = [0xff3b1a, 0xff7a1a, 0xffb02e, 0xffd23f, 0xff5a1a], by = c.bodyY;
+    for (let i = 0; i < 5; i++) { const k = i - 2, a = 2 - Math.abs(k); c.limb(c.root, [k * 0.08, by + 0.1, -c.bodyL * 0.8], [k * 0.6, by + 0.25 + a * 0.18, -c.bodyL - 2.0 - a * 0.55], 0.15, 0.02, c.fx(fl[i]), 4); }   // flame tail
+    const h = c.head({ r: 0.52, y: by + 0.78, z: 0.92, col: 0xffd23f, eye: { r: 0.1, col: 0x3a0a00 }, beak: { type: 'hook', len: 0.5, w: 0.2, col: 0xffa31a, tip: 0xff5a1a } });
+    for (let i = 0; i < 3; i++) c.add(h, GEO.cone(0.13, 0.95, 4), c.fx([0xff3b1a, 0xff7a1a, 0xffd23f][i]), { p: [(i - 1) * 0.16, 0.56, -0.15], r: [-0.5, 0, (i - 1) * 0.32] });   // flame crest
+  },
+  thunderbird(c) {
+    c.scale = 1.4; const indigo = 0x3a3a9a, bolt = 0xffe066;
+    c.torso({ size: [1.1, 1.0, 1.4], lift: 0.38, col: indigo, belly: 0x5a5ac8 });
+    c.wings({ span: 4.6, chord: 1.4, col: indigo, tip: 0x1f1f5a, fingers: 6, taper: 0.8 });
+    for (const w of c.wingInfo) {
+      c.add(w.p, GEO.box(w.inner * 0.9, 0.08, 0.7), c.m(0x1f1f5a), { p: [w.s * w.inner * 0.45, -0.09, -0.45] });              // second feather tier
+      for (let i = 0; i < 4; i++) c.add(w.p, GEO.box(0.62, 0.035, 0.13), c.fx(bolt), { p: [w.s * (0.5 + i * 0.6), 0.07, (i % 2) * 0.28 - 0.14], r: [0, (i % 2 ? 0.7 : -0.7), 0] });   // lightning bolts
+    }
+    c.add(c.root, GEO.box(0.9, 0.12, 1.3), c.m(0x1f1f5a), { p: [0, c.bodyY + 0.05, -c.bodyL - 0.5], r: [0.2, 0, 0] });         // tail base
+    for (let i = 0; i < 3; i++) c.add(c.root, GEO.box(0.5, 0.06, 0.7), c.fx(bolt), { p: [(i % 2 ? -0.18 : 0.18), c.bodyY + 0.2, -c.bodyL - 0.5 - i * 0.6], r: [0.2, i % 2 ? -0.5 : 0.5, 0] });   // bolt tail
+    c.legs({ col: 0xc9a227, thick: 0.13, foot: 1.5 });
+    const h = c.head({ r: 0.6, y: c.bodyY + 0.8, z: 0.92, col: indigo, eye: { r: 0.13, col: bolt }, beak: { type: 'hook', len: 0.62, w: 0.25, col: bolt, tip: 0xe0a830 } });
+    for (const s of [-1, 1]) { c.add(h, GEO.cone(0.1, 0.62, 4), c.fx(bolt), { p: [s * 0.22, 0.58, -0.05], r: [-0.2, 0, -s * 0.45] }); c.add(h, GEO.cone(0.08, 0.5, 4), c.fx(bolt), { p: [s * 0.4, 0.98, -0.1], r: [-0.2, 0, s * 0.6] }); }   // lightning horns
+  },
+};
+
+function disposeBird(g) {   // free GPU memory for a removed bird; the shared eye / aura / ring materials stay
+  const shared = new Set([MAT.eye]); for (const r of Object.values(MAT.bird)) { shared.add(r.aura); shared.add(r.ring); }
+  g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && !shared.has(o.material)) o.material.dispose(); });
+}
 function createBirdMesh(key) {
-  const info = BALANCE.birds[key] || BALANCE.birds.sparrow, look = BIRD_LOOK[key] || {}, rc = BALANCE.rarities[info.rarity].color;
-  const rm = rarityMats(info.rarity), g = new THREE.Group();
-  const lam = (color) => new THREE.MeshLambertMaterial({ color, emissive: rc, emissiveIntensity: 0.12 });   // own material per bird: flashes stay local
-  const bodyMat = lam(info.body), headMat = look.head !== undefined ? lam(look.head) : bodyMat;
-  const tipMat = lam(new THREE.Color(info.body).multiplyScalar(0.7)), beakMat = lam(look.beak !== undefined ? look.beak : 0xffa62b);
-  const mats = [...new Set([bodyMat, headMat, tipMat, beakMat])];
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.9, 9, 7), bodyMat); body.scale.set(1, 0.85, 1.3); body.position.y = 0.6; body.castShadow = true; g.add(body);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 8, 6), headMat); head.position.set(0, 1.35, 0.85); head.castShadow = true; g.add(head);
-  const bl = look.beakLen || 1;
-  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.55, 5), beakMat); beak.rotation.x = Math.PI / 2; beak.scale.y = bl; beak.position.set(0, 1.3, 1.5 + (bl - 1) * 0.27); g.add(beak);
-  for (const s of [-1, 1]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.1, 5, 4), MAT.eye); e.position.set(s * 0.28, 1.5, 1.25); g.add(e); }
-  if (look.crest !== undefined) {
-    const cm = lam(look.crest); mats.push(cm);
-    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.8, 5), cm); crest.position.set(0, 2.0, 0.6); crest.rotation.x = -0.45; g.add(crest);
-  }
-  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.9), tipMat); tail.position.set(0, 0.7, -1.4); tail.rotation.x = 0.3; g.add(tail);
-  const wings = [];
-  for (const s of [-1, 1]) {
-    const pivot = new THREE.Group(); pivot.position.set(s * 0.55, 0.85, 0.1);
-    const w = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.1, 1.0), bodyMat); w.position.x = s * 1.0; w.castShadow = true; pivot.add(w);
-    const tip = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.08, 0.7), tipMat); tip.position.set(s * 2.2, 0, -0.1); pivot.add(tip);
-    g.add(pivot); wings.push(pivot);
-  }
-  const aura = new THREE.Mesh(new THREE.SphereGeometry(1.9, 10, 8), rm.aura); aura.position.y = 0.8; g.add(aura);
-  const ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.75, 24), rm.ring); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.05; g.add(ring);
-  const shield = new THREE.Mesh(new THREE.SphereGeometry(2.1, 12, 8), new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.35, depthWrite: false })); shield.position.y = 0.8; shield.visible = false; g.add(shield);
-  const shadow = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0x1a0030, transparent: true, opacity: 0.6, depthWrite: false })); shadow.position.y = 0.8; shadow.visible = false; g.add(shadow);
-  const aimArrow = new THREE.Mesh(new THREE.ConeGeometry(0.45, 5, 4), rm.ring); aimArrow.rotation.x = Math.PI / 2; aimArrow.position.set(0, 0.3, 3.5); aimArrow.visible = false;
+  const info = BALANCE.birds[key] || BALANCE.birds.sparrow, c = makeBirdCtx(info);
+  (SPECIES[key] || SPECIES.sparrow)(c);
+  // measure the bare model (wings spread) before adding aura / shields, for label height and preview framing
+  const box = new THREE.Box3().setFromObject(c.g), size = box.getSize(new THREE.Vector3()), top = box.max.y, g = c.g;
+  const rm = rarityMats(info.rarity), R = Math.max(1.9, top * 0.62), cy = Math.max(0.8, top * 0.45);
+  c.add(g, GEO.sph(R, 10, 8), rm.aura, { p: [0, cy, 0] });
+  c.add(g, new THREE.RingGeometry(R * 0.74, R * 0.92, 28), rm.ring, { p: [0, 0.05, 0], r: [-R90, 0, 0] });
+  const shield = c.add(g, GEO.sph(R + 0.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0x60a5fa, transparent: true, opacity: 0.35, depthWrite: false }), { p: [0, cy, 0] }); shield.visible = false;
+  const shadow = c.add(g, GEO.sph(R + 0.3, 12, 8), new THREE.MeshBasicMaterial({ color: 0x1a0030, transparent: true, opacity: 0.6, depthWrite: false }), { p: [0, cy, 0] }); shadow.visible = false;
+  const aimArrow = c.add(new THREE.Group(), GEO.cone(0.45, 5, 4), rm.ring, { p: [0, 0.3, 3.5 + size.z * 0.2], r: [R90, 0, 0] }); aimArrow.visible = false;
   const aimPivot = new THREE.Group(); aimPivot.add(aimArrow); g.add(aimPivot);
-  g.scale.setScalar(look.s || 1);
-  g.userData = { wings, body, head, beak, beakZ: beak.position.z, mats, shield, shadow, aimPivot, aimArrow, flap: Math.random() * 10, baseScale: look.s || 1, rarityColor: rc };
+  g.scale.setScalar(c.scale);
+  g.userData = { wings: c.wingPivots, body: c.bodyMesh, head: c.headGroup, headZ: c.headZ, mats: c.mats, shield, shadow, aimPivot, aimArrow, flap: Math.random() * 10,
+                 baseScale: c.scale, rarityColor: c.rc, top: top * c.scale, size };
   return g;
 }
+
 const PICK_GEO = {
   health: () => { const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({ color: 0xff3b5c, emissive: 0x661020 }); g.add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.5, 0.5), m)); g.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.4, 0.5), m)); return g; },
   speed:  () => new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.4, 5), new THREE.MeshLambertMaterial({ color: 0xffe066, emissive: 0x665500 })),
@@ -1610,14 +2005,18 @@ function ensurePreview() {
 }
 function setPreviewBird(key) {
   ensurePreview();
-  if (pvBird) pvScene.remove(pvBird);
+  if (pvBird) { pvScene.remove(pvBird); disposeBird(pvBird); }
   pvBird = createBirdMesh(key); pvScene.add(pvBird);
+  const sz = pvBird.userData.size, fit = Math.min(2.6, 5.4 / sz.y, 10.5 / Math.max(sz.x, sz.z));
+  pvBird.scale.setScalar(fit); pvBird.userData.cy = sz.y * fit * 0.42;
+  pvCam.position.set(0, pvBird.userData.cy + 2.4, 11.5); pvCam.lookAt(0, pvBird.userData.cy, 0);
 }
 function renderPreview(t) {
   if (!pvRenderer || !pvBird || !$('birds').classList.contains('show')) return;
   const cv = pvRenderer.domElement, w = cv.clientWidth, h = cv.clientHeight; if (!w || !h) return;
   if (cv.width !== Math.round(w * 2) || cv.height !== Math.round(h * 2)) { pvRenderer.setPixelRatio(1); pvRenderer.setSize(Math.round(w * 2), Math.round(h * 2), false); pvCam.aspect = w / h; pvCam.updateProjectionMatrix(); }
-  pvBird.rotation.y = t * 0.8; const f = Math.sin(t * 6) * 0.5; pvBird.userData.wings[0].rotation.z = -f; pvBird.userData.wings[1].rotation.z = f; pvBird.position.y = Math.sin(t * 2) * 0.15;
+  const pin = window.__previewAngle;   // (tests set window.__previewAngle to freeze the pose)
+  pvBird.rotation.y = pin !== undefined ? pin : t * 0.8; const f = pin !== undefined ? 0.2 : Math.sin(t * 6) * 0.5; pvBird.userData.wings[0].rotation.z = -f; pvBird.userData.wings[1].rotation.z = f; pvBird.position.y = pin !== undefined ? 0 : Math.sin(t * 2) * 0.15;
   pvRenderer.render(pvScene, pvCam);
 }
 // ---- Settings
@@ -1649,7 +2048,7 @@ function showLobby(m) {
 }
 function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
 function clearMatch() {
-  for (const e of G.ents.values()) { scene.remove(e.mesh); e.label.remove(); }
+  for (const e of G.ents.values()) { scene.remove(e.mesh); disposeBird(e.mesh); e.label.remove(); }
   for (const p of G.projectiles.values()) scene.remove(p.mesh);
   for (const p of G.pickups.values()) scene.remove(p.mesh);
   for (const c of G.chests.values()) scene.remove(c.mesh);
@@ -1991,13 +2390,13 @@ function frame(now) {
     const vy = e.pvy || 0;
     e.mesh.rotation.x = e.mode ? clamp(-vy / 14, -0.6, 0.6) : (e.y > groundY(e.x, e.z) + 0.3 ? 0.3 : 0);
     u.shield.visible = !!(e.flags & 1); u.shadow.visible = !!(e.flags & 2);
-    if (e.biteT > 0) { e.biteT -= dt; const k = Math.sin(Math.max(0, e.biteT) / 0.25 * Math.PI) * 0.9; u.head.position.z = 0.85 + k; u.beak.position.z = u.beakZ + k; }
-    else { u.head.position.z = 0.85; u.beak.position.z = u.beakZ; }
+    if (e.biteT > 0) { e.biteT -= dt; const k = Math.sin(Math.max(0, e.biteT) / 0.25 * Math.PI) * 0.9; u.head.position.z = u.headZ + k; }
+    else u.head.position.z = u.headZ;
     const raged = !!(e.flags & 512);   // Cardinal's Crimson Rage glows red
     for (const mt of u.mats) {
       if (e.flash > 0) { mt.emissive.setHex(u.rarityColor); mt.emissiveIntensity = 1.2; }
       else if (raged) { mt.emissive.setHex(0xff2200); mt.emissiveIntensity = 0.8; }
-      else { mt.emissive.setHex(u.rarityColor); mt.emissiveIntensity = 0.12; }
+      else { mt.emissive.setHex(u.rarityColor); mt.emissiveIntensity = EMIS; }
     }
     if (e.flash > 0) e.flash -= dt;
     if ((e.flags & 1024) && Math.random() < 0.25) fxBurst(e.x, e.y + 1, e.z, 0xfff1a8, 2, 3, 0.3);   // Sparrow's Quick Peck
@@ -2005,7 +2404,7 @@ function frame(now) {
     u.aimArrow.visible = isMe && G.input.fire;
     if (isMe) { u.aimPivot.rotation.y = Math.atan2(G.input.ax, G.input.az) - e.yaw; }
     if (!isMe) {
-      const p = toScreen(e.x, e.y + 2.6, e.z), far = distToMe(e) > 140;
+      const p = toScreen(e.x, e.y + u.top + 0.7, e.z), far = distToMe(e) > 140;
       if (p && !far) { e.label.style.display = 'block'; e.label.style.left = p.x + 'px'; e.label.style.top = p.y + 'px'; e.hf.style.width = (e.hp / e.maxHp * 100) + '%'; e.hf.style.background = e.hp / e.maxHp > 0.5 ? '#2dd36f' : e.hp / e.maxHp > 0.25 ? '#fbbf24' : '#ef4444'; }
       else e.label.style.display = 'none';
     }
