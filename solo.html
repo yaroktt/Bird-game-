@@ -76,13 +76,16 @@
   #joyMove { left: calc(28px + env(safe-area-inset-left)); bottom: 28px; }
   #joyAim { right: calc(28px + env(safe-area-inset-right)); bottom: 28px; border-color: rgba(255,120,120,.5); }
   #joyAim .knob { background: rgba(255,140,140,.6); }
+  /* flight stick (right side, left of SUPER): up = take off / climb, down = descend / land */
+  .joyv { display: none; position: fixed; width: 64px; height: 140px; border-radius: 32px; right: calc(282px + env(safe-area-inset-right)); bottom: 80px; background: rgba(255,255,255,.10); border: 2px solid rgba(142,202,230,.65); pointer-events: none; }
+  .joyv .knob { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px; border-radius: 50%; background: rgba(142,202,230,.75); }
+  .joyv.on { border-color: rgba(250,204,21,.8); } .joyv.on .knob { background: rgba(250,204,21,.8); }
+  .joyv span { position: absolute; left: 0; right: 0; text-align: center; font-size: 10px; font-weight: 800; letter-spacing: .5px; opacity: .85; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  .joyv .up { top: 6px; } .joyv .dn { bottom: 6px; }
+  #joyAim .hint { position: absolute; left: 0; right: 0; top: -17px; text-align: center; font-size: 10px; font-weight: 800; opacity: .85; text-shadow: 0 1px 2px #000; }
+  #joyAim.cd { border-color: rgba(160,160,160,.4); }
   .ctl { position: fixed; z-index: 14; border-radius: 50%; border: 0; color: #fff; font-weight: 800; font-size: 12px; text-shadow: 0 1px 2px #000; display: none; touch-action: none; }
   .ctl.show { display: flex; align-items: center; justify-content: center; }
-  #btnFly { left: calc(165px + env(safe-area-inset-left)); bottom: 118px; width: 72px; height: 72px; background: radial-gradient(circle at 35% 35%, #8ecae6, #219ebc 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
-  .ctl.alt { left: calc(258px + env(safe-area-inset-left)); width: 54px; height: 54px; font-size: 20px; background: radial-gradient(circle at 35% 35%, #cdb4db, #6d597a 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
-  #btnUp { bottom: 150px; } #btnDown { bottom: 88px; }
-  #btnBite { right: calc(52px + env(safe-area-inset-right)); bottom: 162px; width: 76px; height: 76px; font-size: 14px; letter-spacing: .5px; background: radial-gradient(circle at 35% 35%, #ff9aa8, #d7263d 72%); box-shadow: 0 4px 12px rgba(0,0,0,.5); }
-  #btnBite.cd { filter: grayscale(.8) brightness(.6); }
   #btnSuper { right: calc(165px + env(safe-area-inset-right)); bottom: 108px; width: 92px; height: 92px; background: radial-gradient(circle at 35% 35%, #fff1a8, #f77f00 70%); box-shadow: 0 4px 12px rgba(0,0,0,.5); flex-direction: column; }
   #btnSuper.cd { filter: grayscale(.8) brightness(.6); }
   #btnSuper svg { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); transform: rotate(-90deg); pointer-events: none; }
@@ -112,11 +115,8 @@
 <!-- =============================================================== touch controls -->
 <div id="touch"></div>
 <div class="joy" id="joyMove"><div class="knob"></div></div>
-<div class="joy" id="joyAim"><div class="knob"></div></div>
-<button class="ctl" id="btnFly">FLY UP</button>
-<button class="ctl alt" id="btnUp">▲</button>
-<button class="ctl alt" id="btnDown">▼</button>
-<button class="ctl" id="btnBite">BITE</button>
+<div class="joy" id="joyAim"><span class="hint">TAP = BITE</span><div class="knob"></div></div>
+<div class="joyv" id="joyFly"><span class="up">▲ FLY</span><span class="dn">LAND ▼</span><div class="knob"></div></div>
 <button class="ctl" id="btnSuper">
   <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="47" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="5"/><circle id="cdRing" cx="50" cy="50" r="47" fill="none" stroke="#fff" stroke-width="5" stroke-dasharray="295.3" stroke-dashoffset="0"/></svg>
   <span class="cdt" id="cdText">SUPER</span><span class="t" id="superName">Feather Burst</span>
@@ -158,7 +158,7 @@
     <div class="setRow"><label for="nameInput">Your name</label><input type="text" id="nameInput" maxlength="14" placeholder="Bird name"></div>
     <div class="setRow"><span>Sound</span><button class="btn secondary small" id="soundBtn">On</button></div>
     <div class="setRow"><span>Graphics</span><button class="btn secondary small" id="gfxBtn">High</button></div>
-    <div id="help">Phone: left stick walks/flies, FLY UP / LAND toggles flight (▲▼ change altitude), right stick aims &amp; auto-fires, BITE button = close-range chomp, drag empty screen to look around.<br>Desktop: WASD move · Space fly/land · Q/E down/up · hold left mouse to shoot at cursor · right-drag or arrows to look · F = super · B = bite</div>
+    <div id="help">Phone: left stick walks/flies. The tall stick beside SUPER is the flight stick: push up to take off and climb, down to descend and land. Right stick: drag to aim &amp; auto-fire, tap it to bite. Drag empty screen to look around.<br>Desktop: WASD move · Space fly/land · Q/E down/up · hold left mouse to shoot at cursor · right-drag or arrows to look · F = super · B = bite</div>
     <div class="row" style="margin-top:10px"><button class="btn" id="settingsBack">Back</button></div>
   </div>
 </div>
@@ -1956,7 +1956,7 @@ function handle(m) {
    7. SCREENS & MATCH FLOW
    ============================================================================= */
 function showScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.toggle('show', s.id === id)); }
-function setControlsVisible(v) { $('hud').classList.toggle('show', v); $('touch').classList.toggle('show', v && isMobile); ['joyMove', 'joyAim'].forEach(j => $(j).style.display = v && isMobile ? 'block' : 'none'); $('btnFly').classList.toggle('show', v); $('btnSuper').classList.toggle('show', v); $('btnBite').classList.toggle('show', v); if (!v) { $('btnUp').classList.remove('show'); $('btnDown').classList.remove('show'); } }
+function setControlsVisible(v) { $('hud').classList.toggle('show', v); $('touch').classList.toggle('show', v && isMobile); ['joyMove', 'joyAim', 'joyFly'].forEach(j => $(j).style.display = v && isMobile ? 'block' : 'none'); $('btnSuper').classList.toggle('show', v); }
 
 const colorHex = (c) => '#' + c.toString(16).padStart(6, '0');
 function birdInfo(key) { return BALANCE.birds[key || G.bird] || BALANCE.birds.sparrow; }
@@ -2078,10 +2078,8 @@ function startMatch(m) {
   showScreen(null); setControlsVisible(true); setFlyButton(0);
   cam.yaw = G.me ? 0 : cam.yaw;
 }
-function setFlyButton(mode) {
-  $('btnFly').textContent = mode ? 'LAND' : 'FLY UP'; $('modeBox').textContent = mode ? '✈ FLYING' : '🐾 GROUND';
-  const showAlt = !!mode && isMobile && G.phase === 'playing';
-  $('btnUp').classList.toggle('show', showAlt); $('btnDown').classList.toggle('show', showAlt); if (!showAlt) altHold = 0;
+function setFlyButton(mode) {   // name kept from the old button: now just updates the mode label and the flight stick colour
+  $('modeBox').textContent = mode ? '✈ FLYING' : '🐾 GROUND'; $('joyFly').classList.toggle('on', !!mode);
 }
 function killFeed(html) {
   const d = document.createElement('div'); d.innerHTML = html; $('killfeed').prepend(d);
@@ -2237,25 +2235,43 @@ function distToMe(p) { return G.me ? Math.hypot(p.x - G.me.x, p.z - G.me.z) : 99
 /* =============================================================================
    9. INPUT: touch joysticks, buttons, keyboard, mouse
    ============================================================================= */
-const joy = { move: { el: $('joyMove'), cx: 0, cy: 0, id: null, x: 0, y: 0 }, aim: { el: $('joyAim'), cx: 0, cy: 0, id: null, x: 0, y: 0 } };
-const JOY_R = 45, JOY_CATCH = 95;
+const joy = { move: { el: $('joyMove'), cx: 0, cy: 0, id: null, x: 0, y: 0 }, aim: { el: $('joyAim'), cx: 0, cy: 0, id: null, x: 0, y: 0, t0: 0, maxD: 0 },
+  fly: { el: $('joyFly'), cx: 0, cy: 0, id: null, x: 0, y: 0, vertical: true } };
+const JOY_R = 45, JOY_CATCH = 95, FLY_R = 42, TAP_MS = 300, TAP_MAX = 11;   // a press shorter than TAP_MS that never leaves the TAP_MAX dead zone is a tap
 let camDrag = null;
 function layoutJoysticks() { for (const j of Object.values(joy)) { const r = j.el.getBoundingClientRect(); j.cx = r.left + r.width / 2; j.cy = r.top + r.height / 2; } }
 function setJoy(j, dx, dy) {
+  if (j.vertical) {   // flight stick: only the vertical travel counts
+    dy = Math.max(-FLY_R, Math.min(FLY_R, dy)); j.x = 0; j.y = dy / FLY_R; j.el.querySelector('.knob').style.transform = `translate(0,${dy}px)`; return;
+  }
   const l = Math.hypot(dx, dy), s = l > JOY_R ? JOY_R / l : 1; dx *= s; dy *= s;
-  j.x = dx / JOY_R; j.y = dy / JOY_R; j.el.firstElementChild.style.transform = `translate(${dx}px,${dy}px)`;
+  j.x = dx / JOY_R; j.y = dy / JOY_R; j.el.querySelector('.knob').style.transform = `translate(${dx}px,${dy}px)`;
+  if (j === joy.aim) j.maxD = Math.max(j.maxD, Math.hypot(dx, dy));
 }
 const touchEl = $('touch');
 touchEl.addEventListener('pointerdown', (e) => {
   SFX.init(); layoutJoysticks();
-  for (const j of Object.values(joy)) if (j.id === null && Math.hypot(e.clientX - j.cx, e.clientY - j.cy) < JOY_CATCH) { j.id = e.pointerId; setJoy(j, e.clientX - j.cx, e.clientY - j.cy); touchEl.setPointerCapture(e.pointerId); return; }
+  for (const j of Object.values(joy)) {
+    const hit = j.vertical ? (Math.abs(e.clientX - j.cx) < 46 && Math.abs(e.clientY - j.cy) < 86) : Math.hypot(e.clientX - j.cx, e.clientY - j.cy) < JOY_CATCH;
+    if (j.id === null && hit) {
+      j.id = e.pointerId; if (j === joy.aim) { j.t0 = performance.now(); j.maxD = 0; }
+      setJoy(j, e.clientX - j.cx, e.clientY - j.cy); touchEl.setPointerCapture(e.pointerId); return;
+    }
+  }
   camDrag = { id: e.pointerId, x: e.clientX, y: e.clientY };
 });
 touchEl.addEventListener('pointermove', (e) => {
   for (const j of Object.values(joy)) if (j.id === e.pointerId) { setJoy(j, e.clientX - j.cx, e.clientY - j.cy); return; }
   if (camDrag && camDrag.id === e.pointerId) { cam.yaw -= (e.clientX - camDrag.x) * 0.006; cam.pitch = clamp(cam.pitch + (e.clientY - camDrag.y) * 0.004, -0.15, 1.2); camDrag.x = e.clientX; camDrag.y = e.clientY; }
 });
-const endPointer = (e) => { for (const j of Object.values(joy)) if (j.id === e.pointerId) { j.id = null; setJoy(j, 0, 0); } if (camDrag && camDrag.id === e.pointerId) camDrag = null; };
+const endPointer = (e) => {
+  for (const j of Object.values(joy)) if (j.id === e.pointerId) {
+    // a quick tap on the aim stick (no drag) is the bite
+    if (j === joy.aim && e.type === 'pointerup' && performance.now() - j.t0 < TAP_MS && j.maxD < TAP_MAX) useBite();
+    j.id = null; setJoy(j, 0, 0);
+  }
+  if (camDrag && camDrag.id === e.pointerId) camDrag = null;
+};
 touchEl.addEventListener('pointerup', endPointer); touchEl.addEventListener('pointercancel', endPointer);
 
 function toggleFly() {
@@ -2266,16 +2282,7 @@ function toggleFly() {
 }
 function useSuper() { if (!G.me || !G.me.alive) return; const e = G.ents.get(G.myBirdId); if (e && e.superCd <= 0) G.input.superSeq++; }
 function useBite() { if (!G.me || !G.me.alive) return; const e = G.ents.get(G.myBirdId); if (e && e.biteCd <= 0) G.input.biteSeq++; }
-let altHold = 0;   // -1 / 0 / +1 from the touch altitude buttons
-for (const [id, v] of [['btnUp', 1], ['btnDown', -1]]) {
-  const b = $(id);
-  b.addEventListener('pointerdown', (e) => { e.preventDefault(); altHold = v; b.setPointerCapture(e.pointerId); });
-  const off = () => { if (altHold === v) altHold = 0; };
-  b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
-}
-$('btnFly').addEventListener('pointerdown', (e) => { e.preventDefault(); SFX.init(); toggleFly(); });
 $('btnSuper').addEventListener('pointerdown', (e) => { e.preventDefault(); SFX.init(); useSuper(); });
-$('btnBite').addEventListener('pointerdown', (e) => { e.preventDefault(); SFX.init(); useBite(); });
 
 // keyboard + mouse (desktop testing)
 const keys = {}; let mouse = { x: 0, y: 0, down: false, drag: null };
@@ -2291,6 +2298,7 @@ window.addEventListener('pointermove', (e) => { if (e.pointerType !== 'mouse') r
 window.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') return; if (e.button === 0) mouse.down = false; mouse.drag = null; });
 canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
+let flyLatch = false;   // stops one push of the flight stick from toggling flight twice
 // Builds this frame's input from joysticks / keys, relative to the camera.
 function gatherInput(dt) {
   const i = G.input, fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw), rx = -Math.cos(cam.yaw), rz = Math.sin(cam.yaw);
@@ -2298,7 +2306,14 @@ function gatherInput(dt) {
   if (keys.KeyW) jy -= 1; if (keys.KeyS) jy += 1; if (keys.KeyA) jx -= 1; if (keys.KeyD) jx += 1;
   const l = Math.hypot(jx, jy); if (l > 1) { jx /= l; jy /= l; }
   i.mx = fx * -jy + rx * jx; i.mz = fz * -jy + rz * jx;
-  i.vy = (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0) + altHold;   // keyboard Q/E or the touch ▲/▼ buttons
+  const fy = Math.abs(joy.fly.y) < 0.18 ? 0 : -joy.fly.y;   // flight stick: up (negative screen y) = climb
+  i.vy = (keys.KeyE ? 1 : 0) - (keys.KeyQ ? 1 : 0) + fy;
+  if (joy.fly.id !== null && G.me) {   // push up on the ground = take off; push down while low = land (one trigger per push)
+    const near = G.me.y - groundY(G.me.x, G.me.z) < 2.4;
+    if (!flyLatch && G.me.mode === 0 && joy.fly.y < -0.6) { toggleFly(); flyLatch = true; }
+    else if (!flyLatch && G.me.mode === 1 && joy.fly.y > 0.6 && near) { toggleFly(); flyLatch = true; }
+  }
+  if (Math.abs(joy.fly.y) < 0.3 || joy.fly.id === null) flyLatch = false;
   if (keys.ArrowLeft) cam.yaw += 2 * dt; if (keys.ArrowRight) cam.yaw -= 2 * dt;
   if (keys.ArrowUp) cam.pitch = clamp(cam.pitch - dt, -0.15, 1.2); if (keys.ArrowDown) cam.pitch = clamp(cam.pitch + dt, -0.15, 1.2);
   // aim: right stick, or mouse position projected to the bird's height
@@ -2463,7 +2478,7 @@ function frame(now) {
     if (G.storm) { const S = G.storm; $('stormText').textContent = S.state === 'wait' ? `Storm shrinks in ${Math.ceil(S.timer)}s` : S.state === 'shrink' ? `⚠ STORM SHRINKING ${Math.ceil(S.timer)}s` : '⚠ FINAL ZONE'; }
     if (myEnt) {
       const st = BALANCE.rarities[birdInfo().rarity], cd = myEnt.superCd, ready = cd <= 0;
-      $('btnBite').classList.toggle('cd', myEnt.biteCd > 0);
+      $('joyAim').classList.toggle('cd', myEnt.biteCd > 0);
       $('btnSuper').classList.toggle('cd', !ready); $('cdRing').style.strokeDashoffset = (295.3 * (ready ? 0 : Math.min(1, cd / st.superCooldown))).toFixed(1);
       $('cdText').textContent = ready ? 'SUPER' : Math.ceil(cd);
     }

@@ -11,7 +11,7 @@ A 3D mobile battle royale for 10 birds. Three.js client in a single `index.html`
 
 ## Bite
 
-Every bird has a **BITE** button (key **B** on desktop): a short-range chomp on the nearest enemy in front of you, flying or on the ground. Damage is the bird's rarity damage x 2.2 (about 26 for Common up to 53 for Legendary), with a 0.7s cooldown. Invisible birds can't be bitten. Tune it in `BALANCE.bite` in `server.js`.
+Every bird can bite: **tap the aim stick** on a phone (a quick press without dragging; dragging aims and fires instead), or press **B** on desktop. A bite is a short-range chomp on the nearest enemy in front of you, flying or on the ground. Damage is the bird's rarity damage x 2.2 (about 26 for Common up to 53 for Legendary), with a 0.7s cooldown. Invisible birds can't be bitten. Tune it in `BALANCE.bite` in `server.js`.
 
 ## Birds
 
@@ -64,11 +64,11 @@ For faster testing: `LOBBY_COUNTDOWN=3 node server.js`.
 | Phone (landscape) | Desktop |
 | --- | --- |
 | Left stick: walk / fly | WASD: move |
-| FLY UP / LAND button | Space: fly / land |
-| ▲ ▼ (while flying): altitude | Q / E: down / up |
-| Right stick: aim + auto-fire | Hold left mouse: shoot at cursor |
+| Flight stick (tall stick beside SUPER): up = take off and climb, down = descend and land | Space: fly / land |
+| (same flight stick while flying) | Q / E: down / up |
+| Right stick: drag to aim + auto-fire, **tap it to bite** | Hold left mouse: shoot at cursor |
 | SUPER button | F: super ability |
-| BITE button | B: bite |
+| | B: bite |
 | Drag empty screen: rotate camera | Right-drag or arrow keys: rotate camera |
 
 ## Editing balance
