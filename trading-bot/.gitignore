@@ -1,0 +1,8 @@
+.env
+data_cache.csv
+bot.log
+__pycache__/
+paper_state.json
+paper_trades.csv
+btc_1h_2y.csv
+btc_1d_max.csv
