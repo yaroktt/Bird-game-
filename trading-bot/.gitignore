@@ -6,3 +6,6 @@ paper_state.json
 paper_trades.csv
 btc_1h_2y.csv
 btc_1d_max.csv
+day_state.json
+day_trades.csv
+day.log
